@@ -94,3 +94,67 @@ Assert '.001j' =~ sd.Imagnumber
 Assert '1e100j'=~ sd.Imagnumber
 Assert '3.14e-10j' =~ sd.Imagnumber
 Assert '3.14_15_93j' =~ sd.Imagnumber
+
+Execute(StringPrefix);
+Assert '' =~ sd.StringPrefix
+Assert 'rb' =~ sd.StringPrefix
+
+Execute(String);
+Assert "'string'" =~ sd.String
+Assert '"string"' =~ sd.String
+Assert '"str\n\r\fstr"' =~ sd.String
+Assert "'str\n'" !~ sd.String
+Assert "'str\\'" !~ sd.String
+
+Execute(Operator);
+Assert '**' =~ sd.Operator
+Assert '**=' =~ sd.Operator
+Assert '>>=' =~ sd.Operator
+Assert '>>' =~ sd.Operator
+Assert '<<' =~ sd.Operator
+Assert '<<=' =~ sd.Operator
+Assert '!=' =~ sd.Operator
+Assert '//=' =~ sd.Operator
+Assert '->' =~ sd.Operator
+Assert '+' =~ sd.Operator
+Assert '+=' =~ sd.Operator
+Assert '-' =~ sd.Operator
+Assert '-=' =~ sd.Operator
+Assert '*=' =~ sd.Operator
+Assert '%' =~ sd.Operator
+Assert '%=' =~ sd.Operator
+Assert '/' =~ sd.Operator
+Assert '/=' =~ sd.Operator
+Assert '^' =~ sd.Operator
+Assert '^=' =~ sd.Operator
+Assert '&' =~ sd.Operator
+Assert '&=' =~ sd.Operator
+Assert '@' =~ sd.Operator
+Assert '@=' =~ sd.Operator
+Assert '|' =~ sd.Operator
+Assert '|=' =~ sd.Operator
+Assert '<=' =~ sd.Operator
+Assert '>=' =~ sd.Operator
+Assert '~' =~ sd.Operator
+Assert '=' =~ sd.Operator
+Assert '==' =~ sd.Operator
+Assert '>' =~ sd.Operator
+Assert '<' =~ sd.Operator
+
+Execute(Bracket);
+Assert '[' =~ sd.Bracket
+Assert ']' =~ sd.Bracket
+Assert '{' =~ sd.Bracket
+Assert '}' =~ sd.Bracket
+Assert '(' =~ sd.Bracket
+Assert ')' =~ sd.Bracket
+
+Execute(Special);
+Assert "\r\n" =~ sd.Special
+Assert "\n" =~ sd.Special
+Assert '...' =~ sd.Special
+Assert ':' =~ sd.Special
+Assert ';' =~ sd.Special
+Assert '.' =~ sd.Special
+Assert ',' =~ sd.Special
+Assert '@' =~ sd.Special

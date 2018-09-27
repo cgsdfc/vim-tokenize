@@ -11,7 +11,7 @@ function! s:maybe(...) abort
 endfunction
 
 let s:all_string_prefixes=[
-      \ "r" , "u" , "R" , "U" , "f" , "F",
+      \ '' , "r" , "u" , "R" , "U" , "f" , "F",
       \ "fr" , "Fr" , "fR" , "FR" , "rf" , "rF" , "Rf" , "RF",
       \ "b" , "B" , "br" , "Br" , "bR" , "BR" , "rb" , "rB" , "Rb" , "RB"
       \]
@@ -44,13 +44,15 @@ let s:Single3='[^''\]*\%(\%(\.\|''\%(''''\)\@!\)[^''\]*\)*'''''''
 let s:Double3='[^"\]*\%(\%(\.\|"\%(""\)\@!\)[^"\]*\)*"""'
 let s:StringPrefix = '\('.join(s:all_string_prefixes, '\|').'\)'
 let s:Triple=s:group(s:StringPrefix . "'''", s:StringPrefix . '"""')
-let s:String=s:group(s:StringPrefix."'[^\n'\\]*\\%(\\.[^\n'\\]*\\)*'",
-            \ s:StringPrefix."\"[^\n\"\\]*\\%(\\.[^\n\"\\]*\\)*\"")
+
+let s:String=s:group(s:StringPrefix.
+      \ '''[^'."\n".'''\\]*\%(\\.[^'."\n".'''\\]*\)*''',
+      \ s:StringPrefix.'"[^'."\n".'"\\]*\%(\\.[^'."\n".'"\\]*\)*"')
 
 let s:Operator=s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '//=', '->',
             \ '[+\-*/%&@|^=<>]=\=',
-            \ '~')
+            \ '\~')
 
 let s:Bracket='[][(){}]'
 let s:Special=s:group("\r\\=\n", '\.\.\.', '[:;.,@]')
