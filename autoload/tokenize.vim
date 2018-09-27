@@ -16,7 +16,7 @@ let s:all_string_prefixes=[
       \ "b" , "B" , "br" , "Br" , "bR" , "BR" , "rb" , "rB" , "Rb" , "RB"
       \]
 
-let s:cookie="^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([-[:alnum:].]\\)\+"
+let s:cookie="^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+"
 let s:blank="^[ \t\f]*\\%([#\r\n]\\|$\\)"
 
 let s:Whitespace = "[ \f\t]"
@@ -38,12 +38,12 @@ let s:Floatnumber = s:group(s:Pointfloat, s:Expfloat)
 let s:Imagnumber = s:group('[0-9]\%(_\=[0-9]\)*[jJ]',s:Floatnumber.'[jJ]')
 let s:Number = s:group(s:Imagnumber,s:Floatnumber,s:Intnumber)
 
-let s:Single='[^''\]*\%(\.[^''\]*\)*'''
-let s:Double='[^"\]*\%(\.[^"\]*\)*"'
-let s:Single3='[^''\]*\%(\%(\.\|''\%(''''\)\@!\)[^''\]*\)*'''''''
-let s:Double3='[^"\]*\%(\%(\.\|"\%(""\)\@!\)[^"\]*\)*"""'
+let s:Single='[^''\\]*\%(\\.[^''\\]*\)*'''
+let s:Double='[^"\\]*\%(\\.[^"\\]*\)*"'
+let s:Single3='[^''\\]*\%(\%(\\.\|''\%(''''\)\@!\)[^''\\]*\)*'''''''
+let s:Double3='[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""'
 let s:StringPrefix = '\('.join(s:all_string_prefixes, '\|').'\)'
-let s:Triple=s:group(s:StringPrefix . "'''", s:StringPrefix . '"""')
+let s:Triple=s:group(s:StringPrefix."'''",s:StringPrefix.'"""')
 
 let s:String=s:group(s:StringPrefix.
       \ '''[^'."\n".'''\\]*\%(\\.[^'."\n".'''\\]*\)*''',

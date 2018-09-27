@@ -105,6 +105,7 @@ Assert '"string"' =~ sd.String
 Assert '"str\n\r\fstr"' =~ sd.String
 Assert "'str\n'" !~ sd.String
 Assert "'str\\'" !~ sd.String
+Assert "r'str\\'" !~ sd.String
 
 Execute(Operator);
 Assert '**' =~ sd.Operator
@@ -158,3 +159,24 @@ Assert ';' =~ sd.Special
 Assert '.' =~ sd.Special
 Assert ',' =~ sd.Special
 Assert '@' =~ sd.Special
+
+Execute(Single Double Single3 Double3 Triple);
+Assert "a\aa'" =~ sd.Single
+Assert 'a\aa"' =~ sd.Double
+Assert "aaa'''" =~ sd.Single3
+Assert 'aaa"""' =~ sd.Double3
+Assert 'aaa""""' =~ sd.Double3
+Assert 'aaa\a"""' =~ sd.Double3
+
+Execute(cookie);
+let s='[[:alnum:]-.]\+'
+Assert '1-2.' =~ s
+Assert '# coding=utf-8' =~ sd.cookie
+Assert '  # coding= utf-8' =~ sd.cookie
+Assert '  # coding: utf-8' =~ sd.cookie
+
+Execute(Whitespace Comment Ignore);
+Assert "\t" =~ sd.Whitespace
+Assert ' ' =~ sd.Whitespace
+Assert '# this is a comment' =~ sd.Comment
+Assert " \\\r\n # comment" =~ sd.Ignore
