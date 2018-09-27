@@ -1,3 +1,5 @@
+let s:token=g:tokenize#token#token
+
 function! s:group(...) abort
   return '\('.join(a:000, '\|').'\)'
 endfunction
@@ -99,4 +101,16 @@ endfunction
 
 function! tokenize#scriptdict()
   return s:
+endfunction
+
+function! tokenize#detect_encoding(readline) abort
+  let line=a:readline()
+  let match=matchlist(line, s:cookie)[1]
+endfunction
+
+function! tokenize#tokenize() dict
+  if self.column > self.indents[-1]
+    call add(self.indents, self.column)
+    return [s:tokens.INDENT]
+  endif
 endfunction
