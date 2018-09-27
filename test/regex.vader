@@ -1,0 +1,96 @@
+Before;
+let sd=tokenize#scriptdict()
+
+" 注意：=~的匹配是部分匹配，即'1_' =~ sd.Decnumber 为真。
+" 若要实现完全匹配，要在regex加上^$或者\<\>。
+
+" integer      ::=  decinteger | bininteger | octinteger | hexinteger
+" decinteger   ::=  nonzerodigit (["_"] digit)* | "0"+ (["_"] "0")*
+" bininteger   ::=  "0" ("b" | "B") (["_"] bindigit)+
+" octinteger   ::=  "0" ("o" | "O") (["_"] octdigit)+
+" hexinteger   ::=  "0" ("x" | "X") (["_"] hexdigit)+
+" nonzerodigit ::=  "1"..."9"
+" digit        ::=  "0"..."9"
+" bindigit     ::=  "0" | "1"
+" octdigit     ::=  "0"..."7"
+" hexdigit     ::=  digit | "a"..."f" | "A"..."F"
+
+Execute(Hexnumber);
+Assert '0x1' =~ sd.Hexnumber
+Assert '0x_123_456' =~ sd.Hexnumber
+Assert '0xabcdef' =~ sd.Hexnumber
+Assert '0x01' =~ sd.Hexnumber
+
+Execute(Binnumber);
+Assert '0b000' =~ sd.Binnumber
+Assert '0B101' =~ sd.Binnumber
+
+Execute(Octnumber);
+Assert '0o123' =~ sd.Octnumber
+Assert '0o012' =~ sd.Octnumber
+
+Execute(Decnumber);
+Assert '0' =~ sd.Decnumber
+Assert '00000' =~ sd.Decnumber
+Assert '0_000_000' =~ sd.Decnumber
+Assert '123' =~ sd.Decnumber
+Assert '1_2_3' =~ sd.Decnumber
+
+Execute(Intnumber);
+Assert '123_123_123' =~ sd.Intnumber
+Assert '0x012_abc' =~ sd.Intnumber
+
+Execute(Number);
+Assert "7" =~ sd.Number
+Assert "2147483647" =~ sd.Number
+Assert "0o177" =~ sd.Number
+Assert "0b100110111" =~ sd.Number
+Assert "3" =~ sd.Number
+Assert "79228162514264337593543950336" =~ sd.Number
+Assert "0o377" =~ sd.Number
+Assert "0xdeadbeef" =~ sd.Number
+Assert "100_000_000_000" =~ sd.Number
+Assert "0b_1110_0101" =~ sd.Number
+
+" floatnumber   ::=  pointfloat | exponentfloat
+" pointfloat    ::=  [digitpart] fraction | digitpart "."
+" exponentfloat ::=  (digitpart | pointfloat) exponent
+" digitpart     ::=  digit (["_"] digit)*
+" fraction      ::=  "." digitpart
+" exponent      ::=  ("e" | "E") ["+" | "-"] digitpart
+
+Execute(Exponent);
+Assert "e-1" =~ sd.Exponent
+Assert "e1" =~ sd.Exponent
+Assert "e+1_2_3" =~ sd.Exponent
+
+Execute(Pointfloat);
+Assert '3.14' =~ sd.Pointfloat
+Assert '1_2_3.4_5_6' =~ sd.Pointfloat
+Assert '1_2_3.4_5_6e11' =~ sd.Pointfloat
+Assert '123.' =~ sd.Pointfloat
+Assert '123.e111' =~ sd.Pointfloat
+Assert '.1' =~ sd.Pointfloat
+Assert '.1_2_3' =~ sd.Pointfloat
+
+Execute(Expfloat);
+Assert '1e-1' =~ sd.Expfloat
+Assert '0_1_2e23' =~ sd.Expfloat
+
+Execute(Floatnumber);
+Assert '3.14' =~ sd.Floatnumber
+Assert '10.' =~ sd.Floatnumber
+Assert '.001' =~ sd.Floatnumber
+Assert '1e100' =~ sd.Floatnumber
+Assert '31.4e-10' =~ sd.Floatnumber
+Assert '0e0' =~ sd.Floatnumber
+Assert '3.14_15_93' =~ sd.Floatnumber
+
+Execute(Imagnumber);
+Assert '3.14j' =~ sd.Imagnumber
+Assert '10.j' =~ sd.Imagnumber
+Assert '10j' =~ sd.Imagnumber
+Assert '.001j' =~ sd.Imagnumber
+Assert '1e100j'=~ sd.Imagnumber
+Assert '3.14e-10j' =~ sd.Imagnumber
+Assert '3.14_15_93j' =~ sd.Imagnumber
