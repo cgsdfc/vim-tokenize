@@ -37,11 +37,11 @@ let s:Decnumber = s:regex('\%(0\%(_\=0\)*\|[1-9]\%(_\=[0-9]\)*\)')
 let s:Intnumber = s:group(s:Hexnumber,s:Binnumber,s:Octnumber,s:Decnumber)
 
 let s:Exponent = s:regex('[eE][-+]\=[0-9]\%(_\=[0-9]\)*')
-let s:Pointfloat = s:regex(s:group('[0-9]\%(_\=[0-9]\)*\.\%([0-9]\%(_\=[0-9]\)*\)\=',
-      \ '\.[0-9]\%(_\=[0-9]\)*').s:maybe(s:Exponent))
+let s:Pointfloat = s:group(s:regex('[0-9]\%(_\=[0-9]\)*\.\%([0-9]\%(_\=[0-9]\)*\)\='),
+      \ s:regex('\.[0-9]\%(_\=[0-9]\)*')).s:maybe(s:Exponent)
 let s:Expfloat = s:regex('[0-9]\%(_\=[0-9]\)*'.s:Exponent)
 let s:Floatnumber = s:group(s:Pointfloat, s:Expfloat)
-let s:Imagnumber = s:regex(s:group('[0-9]\%(_\=[0-9]\)*[jJ]',s:Floatnumber.'[jJ]'))
+let s:Imagnumber = s:group(s:regex('[0-9]\%(_\=[0-9]\)*[jJ]'),s:Floatnumber.'[jJ]')
 let s:Number = s:group(s:Imagnumber,s:Floatnumber,s:Intnumber)
 
 let s:Single=s:regex('[^''\\]*\%(\\.[^''\\]*\)*''')
@@ -71,7 +71,7 @@ let s:ContStr=s:group(s:StringPrefix."[^\n'\\]*\\%(\\.[^\n'\\]*\\)*"
             \ .s:group("'", "\\\r\\=\n"),
             \ s:StringPrefix."\"[^\n\"\\]*\\%(\\.[^\n\"\\]*\\)*"
             \ .s:group('"', "\\\r\\=\n"))
-let s:PseudoExtras=s:group("\\\r\\=\n\\|\\%$", s:Comment, s:Triple)
+let s:PseudoExtras=s:group(s:regex("\\\r\\=\n\\|\\%$"), s:Comment, s:Triple)
 let s:PseudoToken=s:Whitespace.s:group(s:PseudoExtras,s:Number,s:Funny,s:ContStr,s:Name)
 
 let s:endpats={}
