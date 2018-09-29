@@ -1,2 +1,2 @@
 doc/tags
-autoload/tokenize/token.vim
+__pycache__/
