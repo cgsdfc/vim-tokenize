@@ -2,22 +2,20 @@
 import re
 import tokenize
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 class TokenGen:
     AU_PATH=re.compile(r'.*/?autoload/(.*)\.vim')
-    TOKEN='Value'
-    TOK_NAME='Name'
-    EXACT_TYPE='ExactType'
 
     def __init__(self, file_):
         self.file_=file_
         self.token_list=[(name,val) for name,val in vars(tokenize).items()
                 if name.isupper() and isinstance(val, int)]
         ns=self.make_ns(file_)
-        self.token_var=f'{ns}#{self.TOKEN}'
-        self.tok_name_var=f'{ns}#{self.TOK_NAME}'
-        self.exact_var=f'{ns}#{self.EXACT_TYPE}'
+        self.token_var=f'{ns}#Value'
+        self.tok_name_var=f'{ns}#Name'
+        self.exact_var=f'{ns}#ExactType'
+        self.all_string_prefixes_var=f'{ns}#AllStringPrefixes'
 
     def make_ns(self, file_):
         '''Return the autoload namespace given ``file_``.
@@ -45,7 +43,12 @@ class TokenGen:
             out.write(f'let {self.exact_var}={{}}\n')
             for op,val in tokenize.EXACT_TOKEN_TYPES.items():
                 out.write(f'let {self.exact_var}[{op!r}]={val}\n')
+            out.write('\n')
 
+            # all_string_prefixes
+            out.write(f'let {self.all_string_prefixes_var}=[')
+            out.write(', '.join(f'{s!r}' for s in tokenize._all_string_prefixes()))
+            out.write(']\n')
 
 def main():
     import argparse

@@ -94,15 +94,6 @@ let s:Tokenizer = {
       \ 'async_def_nl': v:false,
       \ }
 
-function! s:TokenInfo(type, string, start, end, line)
-  return {
-        \ 'type': a:type,
-        \ 'string': a:string,
-        \ 'start': a:start,
-        \ 'line': a:line,
-        \ }
-endfunction
-
 function! tokenize#scriptdict()
   return s:
 endfunction
