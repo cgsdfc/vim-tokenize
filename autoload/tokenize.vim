@@ -16,9 +16,9 @@ function! s:group(...) abort
   return '\%('.join(a:000, '\|').'\)'
 endfunction
 
-function! s:any(...) abort
-  return call('s:group', a:000).'*'
-endfunction
+" function! s:any(...) abort
+"   return call('s:group', a:000).'*'
+" endfunction
 
 function! s:maybe(...) abort
   return call('s:group', a:000).'\='
@@ -40,7 +40,7 @@ let s:Hexnumber = s:regex('0[xX]\%(_\=[0-9a-fA-F]\)\+')
 let s:Binnumber = s:regex('0[bB]\%(_\=[01]\)\+')
 let s:Octnumber = s:regex('0[oO]\%(_\=[0-7]\)\+')
 let s:Decnumber = s:regex('\%(0\%(_\=0\)*\|[1-9]\%(_\=[0-9]\)*\)')
-let s:Intnumber = s:cgroup(s:Hexnumber,s:Binnumber,s:Octnumber,s:Decnumber)
+let s:Intnumber = s:group(s:Hexnumber,s:Binnumber,s:Octnumber,s:Decnumber)
 
 let s:Exponent = s:regex('[eE][-+]\=[0-9]\%(_\=[0-9]\)*')
 let s:Pointfloat = s:group(s:regex('[0-9]\%(_\=[0-9]\)*\.\%([0-9]\%(_\=[0-9]\)*\)\='),
@@ -57,9 +57,9 @@ let s:Double3=s:regex('[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""')
 let s:StringPrefix = s:regex('\('.join(s:AllStringPrefixes, '\|').'\)')
 let s:Triple=s:group(s:StringPrefix."'''",s:StringPrefix.'"""')
 
-let s:String=s:group(s:StringPrefix.
-      \ '''[^'."\n".'''\\]*\%(\\.[^'."\n".'''\\]*\)*''',
-      \ s:StringPrefix.'"[^'."\n".'"\\]*\%(\\.[^'."\n".'"\\]*\)*"')
+" let s:String=s:group(s:StringPrefix.
+"       \ '''[^'."\n".'''\\]*\%(\\.[^'."\n".'''\\]*\)*''',
+"       \ s:StringPrefix.'"[^'."\n".'"\\]*\%(\\.[^'."\n".'"\\]*\)*"')
 
 let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '//=', '->',
@@ -67,8 +67,8 @@ let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '\~'))
 
 let s:Bracket=s:regex('[][(){}]')
-let s:Special=s:regex(s:group('\\\=', '\.\.\.', '[:;.,@]'))
-let s:Funny=s:group(s:Operator,s:Bracket,s:Special)
+let s:Special=s:regex(s:group('\.\.\.', '[:;.,@]', '\\\='))
+" let s:Funny=s:group(s:Operator,s:Bracket,s:Special)
 
 " First (or only) line of ' or " string.
 let s:ContStr=s:group(s:StringPrefix.'''[^''\\]*\%(\\.[^''\\]*\)*'
@@ -118,10 +118,10 @@ function! tokenize#scriptdict()
   return s:
 endfunction
 
-function! tokenize#detect_encoding(readline) abort
-  let line=a:readline()
-  let match=matchlist(line, s:cookie)[1]
-endfunction
+" function! tokenize#detect_encoding(readline) abort
+"   let line=a:readline()
+"   let match=matchlist(line, s:cookie)[1]
+" endfunction
 
 function! s:IndentationError(msg, args)
   return a:msg
@@ -131,16 +131,20 @@ function! s:TokenError(msg, args)
   return a:msg
 endfunction
 
-let s:PseudoToken = [
-      \ s:PseudoExtras,
-      \ s:Number,
-      \ s:Operator,
-      \ s:Bracket,
-      \ s:Special,
-      \ s:ContStr,
-      \ s:Name,
-      \]
+let s:PseudoToken = map([
+      \ s:cgroup(s:Number, s:Operator, s:Bracket, s:Name, s:Special),
+      \ '',
+      \], 's:Whitespace.v:val')
 
+" let s:PseudoToken = map([
+"       \ '',
+"       \ s:Number,
+"       \ s:Operator,
+"       \ s:Bracket,
+"       \ s:Name,
+"       \], 's:Whitespace.v:val')
+
+" {{{1
 function! s:Tokenizer._tokenize()
   if self.stashed isnot 0
     let tok=self.stashed
@@ -239,15 +243,20 @@ function! s:Tokenizer._tokenize()
   endif
 
   while self.pos < self.max                    " scan for tokens
-    for pat in s:PseudoToken
-      if 
+    for pattern in s:PseudoToken
+      let pseudomatch = matchlist(self.line, pattern, self.pos)
+      if !empty(pseudomatch)
+        break
+      endif
     endfor
-    let pseudomatch=matchlist(self.line, s:PseudoToken, self.pos)
     if empty(pseudomatch)
       let tok = [TokenValue.ERRORTOKEN, self.line[self.pos],
             \ [self.lnum, self.pos], [self.lnum, self.pos+1], self.line]
       self.pos += 1
       return tok
+    endif
+    if empty(pseudomatch[1])
+      continue
     endif
     let [entire, token] = pseudomatch[:1]
     let initial = token[0]
@@ -331,12 +340,62 @@ function! s:Tokenizer._tokenize()
         elseif initial =~ '[)]}'
           let self.parenlev -= 1
         endif
-        return [TokenValue.OP, token, spos, epos, self.line]
+        return s:TokenInfo( s:TokenValue.OP, token, spos, epos, self.line )
       endif
     endwhile
   endwhile
 endfunction
+" }}}1
 
+let s:LineScanner = {
+      \ 'line': 0,
+      \ 'pos': 0,
+      \ 'max': 0,
+      \ }
+
+function! s:LineScanner.GetNextToken() abort
+  while 1
+    if self.pos == self.max
+      throw 'StopIteration'
+    endif
+    for pat in s:PseudoToken
+      let psmat = matchlist(self.line, pat, self.pos)
+      if !empty(psmat)
+        break
+      endif
+    endfor
+    if empty(psmat)
+      let self.pos += 1
+      return [s:TokenValue.ERRORTOKEN, '', [self.pos-1, self.pos]]
+    endif
+    let entire = psmat[0]
+    let token = psmat[1]
+    let self.pos += len(entire)
+    if empty(token)
+      continue
+    endif
+    let loc_ = [self.pos-len(token), self.pos]
+    return [s:TokenValue.OP, token, loc_]
+  endwhile
+endfunction
+
+function! tokenize#ScanLine(line) abort
+  let lineScanner = deepcopy(s:LineScanner)
+  let lineScanner.line = a:line
+  let lineScanner.max = len(a:line)
+  let out = []
+  try
+    while 1
+      let val = lineScanner.GetNextToken()
+      let loc_ = call('printf', ['%d,%d:']+val[2])
+      let str = printf('%-8s%-4s%-8s', loc_, s:TokenName[val[0]],
+            \ tokenize#dump(val[1]))
+      Log str
+    endwhile
+  catch 'StopIteration'
+    return out
+  endtry
+endfunction
 
 function! s:Tokenizer.GetNextToken() abort
   if self.error_or_end
@@ -405,3 +464,5 @@ function! tokenize#main(path, out, exact)
     call writefile(val, a:out)
   endif
 endfunction
+
+" vim:set fdm=markers

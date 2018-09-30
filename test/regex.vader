@@ -180,7 +180,6 @@ Assert '' =~ sd.Whitespace
 Assert "\t" =~ sd.Whitespace
 Assert ' ' =~ sd.Whitespace
 Assert '# this is a comment' =~ sd.Comment
-Assert " \\\r\n # comment" =~ sd.Ignore
 
 Execute(ContStr);
 Assert "'string\\" =~ sd.ContStr
@@ -191,13 +190,3 @@ Assert '"string"' =~ sd.ContStr
 Execute(PseudoExtras);
 Assert '' =~ sd.PseudoExtras
 Assert '\' =~ sd.PseudoExtras
-
-Execute(PseudoToken);
-Assert "'''string" =~ sd.PseudoToken
-Assert '  Name ' =~ sd.PseudoToken
-Assert 'import json' =~ sd.PseudoToken
-Assert "print('NOTEXIST')" =~ sd.PseudoToken
-
-Execute(PseudoToken matches things);
-Log matchlist('1111', sd.PseudoToken)
-Log matchlist('string', sd.PseudoToken)
