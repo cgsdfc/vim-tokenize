@@ -1,5 +1,6 @@
 let s:TAB_SIZE=8
 let s:TokenValue=tokenize#token#Value
+let s:TokenName=tokenize#token#Name
 let s:AllStringPrefixes=tokenize#token#AllStringPrefixes
 let s:ExactType=tokenize#token#ExactType
 
@@ -24,8 +25,7 @@ let s:blank=s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
 
 let s:Blank=s:regex('^\s*$')
 let s:Whitespace = s:regex("[ \f\t]")
-let s:Comment = s:regex("#[^\r\n]*")
-let s:Ignore=s:Whitespace.s:any("\\\r\\=\n".s:Whitespace).s:maybe(s:Comment)
+let s:Comment = s:regex('#.*')
 let s:Name = s:regex('\w\+')
 
 let s:Hexnumber = s:regex('0[xX]\%(_\=[0-9a-fA-F]\)\+')
@@ -62,14 +62,12 @@ let s:Bracket=s:regex('[][(){}]')
 let s:Special=s:regex(s:group("\r\\=\n", '\.\.\.', '[:;.,@]'))
 let s:Funny=s:group(s:Operator,s:Bracket,s:Special)
 
-let s:PlainToken=s:group(s:Number,s:Funny,s:String,s:Name)
-let Token=s:Ignore.s:PlainToken
-
-let s:ContStr=s:group(s:StringPrefix."[^\n'\\]*\\%(\\.[^\n'\\]*\\)*"
-            \ .s:group("'", "\\\r\\=\n"),
-            \ s:StringPrefix."\"[^\n\"\\]*\\%(\\.[^\n\"\\]*\\)*"
-            \ .s:group('"', "\\\r\\=\n"))
-let s:PseudoExtras=s:group(s:regex("\\\r\\=\n\\|\\%$"), s:Comment, s:Triple)
+" First (or only) line of ' or " string.
+let s:ContStr=s:group(s:StringPrefix.'''[^''\\]*\%(\\.[^''\\]*\)*'
+            \ .s:group("'", '\\\='),
+            \ s:StringPrefix."\"[^\"\\\\]*\\%(\\\\.[^\"\\\\]*\\)*"
+            \ .s:group('"', '\\\='))
+let s:PseudoExtras=s:group(s:regex('\\\=\|$'), s:Comment, s:Triple)
 let s:PseudoToken=s:Whitespace.s:group(s:PseudoExtras,s:Number,s:Funny,s:ContStr,s:Name)
 
 let s:endpats={}
@@ -156,13 +154,13 @@ function! s:Tokenizer._tokenize()
           call add(contstr, self.line[:end_-1])
           call add(contline, self.line)
           let self.contstr = 0
-          return [s:TokenValue.STRING, join(contstr, ''),
-                \ strstart, [self.lnum, end_], join(contline, '')]
+          return [s:TokenValue.STRING, join(contstr, "\n"),
+                \ strstart, [self.lnum, end_], join(contline, "\n")]
         elseif self.needcont && self.line[-1] != '\'
           let self.contstr = 0
           call add(contstr, self.line)
-          return [s:TokenValue.ERRORTOKEN, join(contstr, ''),
-                \ strstart, [self.lnum, len(self.line)], join(contline, '')]
+          return [s:TokenValue.ERRORTOKEN, join(contstr, "\n"),
+                \ strstart, [self.lnum, len(self.line)], join(contline, "\n")]
         else
           call add(contstr, self.line[:end_-1])
           call add(contline, self.line)
@@ -191,17 +189,18 @@ function! s:Tokenizer._tokenize()
       if self.line[self.pos] == '#'
         let commnet_token = maktaba#string#StripTrailing(self.line[self.pos:])
         let nl_pos = self.pos + len(commnet_token)
-        " Stash the NL
-        let self.stashed = [s:TokenValue.NL, '', [self.lnum, nl_pos],
+        " stash the NL
+        let self.stashed = [s:TokenValue.NL, "\n", [self.lnum, nl_pos],
               \ [self.lnum, self.max], self.line]
         return [s:TokenValue.COMMENT, commnet_token,
               \ [self.lnum, self.pos], [self.lnum, self.pos+len(commnet_token)],
               \ self.line]
+      else
+        return [s:TokenValue.NL, "\n", [self.lnum, self.pos], [self.lnum, self.max],
+              \ self.line]
       endif
-    else
-      return [s:TokenValue.NL, '', [self.lnum, self.pos], [self.lnum, self.max],
-            \ self.line]
     endif
+
     let self.cur_indent = column
     " count indents or dedents
     if column > self.indents[-1]
@@ -209,7 +208,6 @@ function! s:Tokenizer._tokenize()
       return [s:TokenValue.INDENT, self.line[:self.pos-1],
             \ [self.lnum, 0], [self.lnum, self.pos], self.line]
     endif
-  endif
 
   if self.cur_indent < self.indents[-1]
     if index(self.indents, self.cur_indent) < 0
@@ -217,6 +215,7 @@ function! s:Tokenizer._tokenize()
             \ "unindent does not match any outer indentation level",
             \ ["<tokenize>", lnum, pos, line])
     endif
+
     let self.cur_indent = remove(self.indents, -1)
     return [s:TokenValue.DEDENT, '', [self.lnum, self.pos],
           \ [self.lnum, self.pos], self.line]
@@ -241,12 +240,12 @@ function! s:Tokenizer._tokenize()
       return [s:TokenValue.NUMBER, token, spos, epos, self.line]
     elseif initial is ''
       if self.parenlev > 0
-        return [s:TokenValue.NL, token, spos, epos, self.line]
+        return [s:TokenValue.NL, "\n", spos, epos, self.line]
       else
         if self.async_def
           let self.async_def_nl = 1
         endif
-        return [s:TokenValue.NEWLINE, token, spos, epos, self.line]
+        return [s:TokenValue.NEWLINE, "\n", spos, epos, self.line]
       elseif initial == '#'
         return [s:TokenValue.COMMENT, token, spos, epos, self.line]
         " check for triple_quoted
@@ -350,17 +349,39 @@ function! s:do_all(tokenizer)
   endtry
 endfunction
 
-function! tokenize#main(path, out)
+let s:escapes = {
+      \ "\b": '\b',
+      \ "\e": '\e',
+      \ "\f": '\f',
+      \ "\n": '\n',
+      \ "\r": '\r',
+      \ "\t": '\t',
+      \ "\"": '\"',
+      \ "\\": '\\'}
+
+function! tokenize#dump(str)
+  return "'". substitute(a:str, "[\001-\037\"\\\\]",
+        \  '\=get(s:escapes, submatch(0))', 'g')."'"
+endfunction
+
+function! tokenize#main(path, out, exact)
   let tokenizer = tokenize#FromFile(a:path)
   let val = []
   try
     for tk in s:do_all(tokenizer)
       let token_range = call('printf', ['%d,%d-%d,%d:']+tk[2]+tk[3])
+      if tk[0] == s:TokenValue.OP && a:exact
+        let tk[0] = s:ExactType[tk[1]]
+      endif
       call add(val, printf('%-20s%-15s%-15s', token_range,
-            \ s:Name[tk[0]], string(tk[1])))
+            \ s:TokenName[tk[0]], tokenize#dump(tk[1])))
     endfor
   catch
     echo v:exception
   endtry
-  call writefile(val, a:out)
+  if a:out ==# '<stdout>'
+    echo join(val, "\n")
+  else
+    call writefile(val, a:out)
+  endif
 endfunction
