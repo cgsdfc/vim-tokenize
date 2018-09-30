@@ -176,6 +176,7 @@ Assert '  # coding= utf-8' =~ sd.cookie
 Assert '  # coding: utf-8' =~ sd.cookie
 
 Execute(Whitespace Comment Ignore);
+Assert '' =~ sd.Whitespace
 Assert "\t" =~ sd.Whitespace
 Assert ' ' =~ sd.Whitespace
 Assert '# this is a comment' =~ sd.Comment
@@ -192,5 +193,11 @@ Assert '' =~ sd.PseudoExtras
 Assert '\' =~ sd.PseudoExtras
 
 Execute(PseudoToken);
-Assert "'''string" =~ sd.PseudoExtras
-Assert '  Name ' =~ sd.PseudoExtras
+Assert "'''string" =~ sd.PseudoToken
+Assert '  Name ' =~ sd.PseudoToken
+Assert 'import json' =~ sd.PseudoToken
+Assert "print('NOTEXIST')" =~ sd.PseudoToken
+
+Execute(PseudoToken matches things);
+Log matchlist('1111', sd.PseudoToken)
+Log matchlist('string', sd.PseudoToken)
