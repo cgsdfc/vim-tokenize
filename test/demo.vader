@@ -1,0 +1,2 @@
+Execute(Demo);
+ call tokenize#main('./test/demo.py', './test/demo.out')
