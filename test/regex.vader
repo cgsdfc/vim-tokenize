@@ -99,14 +99,6 @@ Execute(StringPrefix);
 Assert '' =~ sd.StringPrefix
 Assert 'rb' =~ sd.StringPrefix
 
-Execute(String);
-Assert "'string'" =~ sd.String
-Assert '"string"' =~ sd.String
-Assert '"str\n\r\fstr"' =~ sd.String
-Assert "'str\n'" !~ sd.String
-Assert "'str\\'" !~ sd.String
-Assert "r'str\\'" !~ sd.String
-
 Execute(Operator);
 Assert '**' =~ sd.Operator
 Assert '**=' =~ sd.Operator
@@ -175,7 +167,7 @@ Assert '# coding=utf-8' =~ sd.cookie
 Assert '  # coding= utf-8' =~ sd.cookie
 Assert '  # coding: utf-8' =~ sd.cookie
 
-Execute(Whitespace Comment Ignore);
+Execute(Whitespace Comment);
 Assert '' =~ sd.Whitespace
 Assert "\t" =~ sd.Whitespace
 Assert ' ' =~ sd.Whitespace

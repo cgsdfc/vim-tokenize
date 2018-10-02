@@ -1,0 +1,43 @@
+Before;
+let PseudoToken=tokenize#PseudoToken
+" Log matchlist(' [ ', PseudoToken)
+
+Execute(PseudoExtras);
+Log matchlist('     ', PseudoToken)
+Log matchlist('', PseudoToken)
+Log matchlist('   \', PseudoToken)
+Log matchlist('    # this is a comment ', PseudoToken)
+Log matchlist('   rb"""  ', PseudoToken)
+Log matchlist('   """  ', PseudoToken)
+Log matchlist("   rb'''  ", PseudoToken)
+Log matchlist("   '''  ", PseudoToken)
+
+Execute(Number);
+Log matchlist('   1234 ', PseudoToken)
+Log matchlist('   .1', PseudoToken)
+Log matchlist('   3.14e-1 ', PseudoToken)
+Log matchlist('   1. ', PseudoToken)
+Log matchlist('   1.j ', PseudoToken)
+
+Execute(Funny);
+Log matchlist('  ... ', PseudoToken)
+Log matchlist(' : ', PseudoToken)
+Log matchlist(' [ ', PseudoToken)
+
+Execute(ContStr);
+Log matchlist(' "string" ', PseudoToken)
+Log matchlist(' "string\', PseudoToken)
+Log matchlist(" 'string'  ", PseudoToken)
+Log matchlist(" 'string\\", PseudoToken)
+
+Execute(Name);
+Log matchlist('      name  ', PseudoToken)
+Log matchlist('      name_1  ', PseudoToken)
+Log matchlist('      __name__  ', PseudoToken)
+
+Execute(Error);
+Log matchlist(' \  ', PseudoToken)
+Log matchlist(' "string\  ', PseudoToken)
+Log matchlist(' `  ', PseudoToken)
+Log matchlist(' ?  ', PseudoToken)
+Log matchlist(' $  ', PseudoToken)

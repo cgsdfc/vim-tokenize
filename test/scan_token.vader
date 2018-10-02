@@ -11,4 +11,18 @@ Execute(Bracket);
 call tokenize#ScanLine(' [ { ( ) } ] ')
 
 Execute(Special);
-call tokenize#ScanLine(' ; : ... . , @ \ ')
+call tokenize#ScanLine(' ; : ... . , @')
+call tokenize#ScanLine('  \')
+
+Execute(Error FIXME);
+call tokenize#ScanLine(' $ ? ` ')
+
+Execute(ContStr);
+call tokenize#ScanLine('   "string" ''string'' "string\')
+call tokenize#ScanLine(' "string"                    ')
+call tokenize#ScanLine(' ''string''         ')
+call tokenize#ScanLine(' "string\')
+
+Execute(PseudoExtras);
+call tokenize#ScanLine('# comment')
+call tokenize#ScanLine('b"""')
