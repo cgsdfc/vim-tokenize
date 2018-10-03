@@ -3,6 +3,7 @@ let s:TokenValue=tokenize#token#Value
 let s:TokenName=tokenize#token#Name
 let s:AllStringPrefixes=tokenize#token#AllStringPrefixes
 let s:ExactType=tokenize#token#ExactType
+let s:__file__ = expand('<sfile>')
 
 function! s:regex(str) abort
   return '\m\C'.a:str
@@ -66,7 +67,7 @@ let s:Triple=s:group(s:StringPrefix."'''", s:StringPrefix.'"""')
 "       \ s:StringPrefix.'"[^'."\n".'"\\]*\%(\\.[^'."\n".'"\\]*\)*"')
 
 let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
-            \ '//=', '->',
+            \ '//=\?', '->',
             \ '[+\-*/%&@|^=<>]=\=',
             \ '\~'))
 
@@ -105,6 +106,7 @@ for s:t in s:AllStringPrefixes
   let s:triple_quoted[s:t."'''"]=1
 endfor
 
+" stashed: right after storing a tok into stashed, function must return!
 let s:Tokenizer = {
       \ 'line': '',
       \ 'async_def': 0,
@@ -154,23 +156,18 @@ function! s:Tokenizer._tokenize()
   while 1
     " detect indent/dedent
     if self.cur_indent < self.indents[-1]
-      echo 'pop DEDENT'
+      call self.logger.debug_('pop DEDENT')
       if index(self.indents, self.cur_indent) < 0
         throw s:IndentationError(
               \ "unindent does not match any outer indentation level",
               \ ["<tokenize>", self.lnum, self.pos, self.line])
       endif
       let self.cur_indent = remove(self.indents, -1)
-      if self.async_def && self.async_def_indent >= self.cur_indent
-        let self.async_def = 0
-        let self.async_def_nl = 0
-        let self.async_def_indent = 0
-      endif
       return s:TokenInfo(s:TokenValue.DEDENT, '', [self.lnum, self.pos],
             \ [self.lnum, self.pos], self.line)
     endif
 
-    if self.lnum == self.buffer_size
+    if self.lnum == self.buffer_size && self.pos == self.max
       if self.contstr
         throw s:TokenError("EOF in multi-line string", strstart)
       endif
@@ -187,7 +184,7 @@ function! s:Tokenizer._tokenize()
     endif
 
     if self.contstr || self.pos == self.max
-      echo 'Fetch line'
+      call self.logger.debug_('Fetch line')
       let self.line=self.buffer_[self.lnum]
       let self.lnum += 1
       let [self.pos, self.max]=[0, len(self.line)]
@@ -214,7 +211,7 @@ function! s:Tokenizer._tokenize()
           continue
         endif
       elseif self.parenlev == 0 && !self.continued " new statement
-        echo 'new statement'
+        call self.logger.debug_('new statement')
         let column = 0
         while self.pos < self.max
           if self.line[self.pos] == ' '
@@ -230,22 +227,29 @@ function! s:Tokenizer._tokenize()
         endwhile
 
         " skip comments or blank lines
-        if self.line[self.pos] == '#'
-          let commnet_token = maktaba#string#StripTrailing(self.line[self.pos:])
-          let cm_pos = self.pos
-          let self.pos = self.max " end this line
-          let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n", [self.lnum, self.max],
-                \ [self.lnum, self.max+1], self.line)
-          return s:TokenInfo(s:TokenValue.COMMENT, commnet_token,
-                \ [self.lnum, self.cm_pos], [self.lnum, cm_pos+len(commnet_token)],
-                \ self.line)
-        elseif self.line[self.pos] == "\n"
-          return s:TokenInfo(s:TokenValue.NL, self.line[self.pos:],
-                \ [self.lnum, self.pos], [self.lnum, len(self.line)], self.line)
+        if self.line[self.pos] =~ "[#\n]"
+          let start_ = self.pos
+          let self.pos = self.max " end this line, do not scan token
+          if self.line[start_] == '#'
+            let commnet_token = maktaba#string#StripTrailing(self.line[start_:])
+            let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n",
+                  \ [self.lnum, self.max],
+                  \ [self.lnum, self.max+1], self.line)
+            return s:TokenInfo(s:TokenValue.COMMENT,
+                  \ commnet_token,
+                  \ [self.lnum, start_],
+                  \ [self.lnum, start_+len(commnet_token)],
+                  \ self.line)
+          else
+            return s:TokenInfo(s:TokenValue.NL, "\n",
+                  \ [self.lnum, start_],
+                  \ [self.lnum, start_+1],
+                  \ self.line)
+          endif
         endif
 
         if column > self.indents[-1]
-          echo 'push INDENT'
+          call self.logger.debug_('push INDENT')
           call add(self.indents, column)
           return s:TokenInfo(s:TokenValue.INDENT, self.line[:self.pos-1],
                 \ [self.lnum, 0], [self.lnum, self.pos], self.line)
@@ -258,12 +262,12 @@ function! s:Tokenizer._tokenize()
       endif
     endif
 
-    echo 'scan for tokens'
+    call self.logger.debug_('scan for tokens')
 
     while self.pos < self.max
       let psmat = matchlist(self.line, s:PseudoToken, self.pos)
       if empty(psmat)
-        echo 'Bad token'
+        call self.logger.debug_('Bad token')
         let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN, self.line[self.pos],
               \ [self.lnum, self.pos], [self.lnum, self.pos+1], self.line)
         let self.pos += 1
@@ -309,7 +313,7 @@ function! s:Tokenizer._tokenize()
       elseif (has_key(s:single_quoted, initial) ||
             \ has_key(s:single_quoted, token[:1]) ||
             \ has_key(s:single_quoted, token[:2]))
-        echo 'single_quoted prefix'
+        call self.logger.debug_('single_quoted prefix')
         if self.line[end_ - 1] == '\'
           let strstart = [self.lnum, start_]
           let endprog = get(s:endpats, initial,
@@ -324,29 +328,7 @@ function! s:Tokenizer._tokenize()
           return s:TokenInfo(s:TokenValue.STRING, token, spos, [self.lnum, self.pos], self.line)
         endif
       elseif initial =~ '[a-zA-Z_]'
-        if token ==# 'async' || token ==# 'await'
-          if self.async_def
-            return [token ==# 'async' ? s:TokenValue.ASYNC : s:TokenValue.AWAIT,
-                  \ token, spos, epos, self.line]
-          endif
-        endif
-        let tok = s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
-        if token ==# 'async' && self.stashed is 0
-          let self.stashed = tok
-          continue
-        endif
-        if token ==# 'def'
-          if self.stashed isnot 0 && self.stashed[0] == s:TokenValue.NAME
-                \ && self.stashed[1] ==# 'async'
-            let self.async_def = 1
-            let self.async_def_indent = self.cur_indent
-            let stashed = self.stashed
-            let stashed[0] = s:TokenValue.ASYNC
-            let self.stashed = 0
-            return stashed
-          endif
-        endif
-        return tok
+        return s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
       elseif initial == '\'
         let self.continued = 1
       else
@@ -418,7 +400,7 @@ function! s:Tokenizer.GetNextToken() abort
     let val=self._tokenize()
     return val
   catch /^Vim(.*):E\d\+:/
-    echo v:exception
+    call self.logger.error(v:exception)
     echoerr 'VimError'
   catch /^\w\+/
     let self.error_or_end=1
@@ -431,18 +413,10 @@ function! tokenize#FromFile(path)
   let b=readfile(a:path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
+  let t_.logger = tokenize#logging#get_logger('./test/tokenize.log')
+  let t_.logger.filename = s:__file__
+  " let t_.logger.log_to_stderr = 1
   return t_
-endfunction
-
-function! s:do_all(tokenizer)
-  let val = []
-  try
-    while 1
-      call add(val, a:tokenizer.GetNextToken())
-    endwhile
-  catch 'StopIteration'
-    return val
-  endtry
 endfunction
 
 let s:escapes = {
@@ -462,19 +436,23 @@ function! tokenize#dump(str)
 endfunction
 
 function! tokenize#main(path, out, exact)
-  let tokenizer = tokenize#FromFile(a:path)
+  let tknr = tokenize#FromFile(a:path)
   let val = []
   try
-    for tk in s:do_all(tokenizer)
+    while 1
+      let tk = tknr.GetNextToken()
       let token_range = call('printf', ['%d,%d-%d,%d:']+tk[2]+tk[3])
       if tk[0] == s:TokenValue.OP && a:exact
         let tk[0] = s:ExactType[tk[1]]
       endif
       call add(val, printf('%-20s%-15s%-15s', token_range,
             \ s:TokenName[tk[0]], tokenize#dump(tk[1])))
-    endfor
+    endwhile
+  catch 'StopIteration'
   catch
-    echo v:exception
+    call tknr.logger.error(v:exception)
+  finally
+    call tknr.logger.flush()
   endtry
   if a:out ==# '<stdout>'
     echo join(val, "\n")

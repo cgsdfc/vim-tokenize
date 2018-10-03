@@ -42,9 +42,9 @@ function! s:Logger._log(level, msg, args)
   endif
 endfunction
 
-function! s:Logger.shutdown() abort
+function! s:Logger.flush() abort
   call writefile(self.buffer_, self.dest)
-  unlet self.buffer_
+  let self.buffer_ = []
 endfunction
 
 function! s:Logger.info(msg, ...)
