@@ -4,9 +4,9 @@ let PseudoToken=tokenize#PseudoToken
 
 Execute(PseudoExtras);
 Log matchlist('     ', PseudoToken)
-Log matchlist('', PseudoToken)
-Log matchlist('   \', PseudoToken)
-Log matchlist('    # this is a comment ', PseudoToken)
+Log matchlist("\n", PseudoToken)
+Log matchlist("   \\\n", PseudoToken)
+Log matchlist("    # this is a comment\n", PseudoToken)
 Log matchlist('   rb"""  ', PseudoToken)
 Log matchlist('   """  ', PseudoToken)
 Log matchlist("   rb'''  ", PseudoToken)
@@ -26,9 +26,9 @@ Log matchlist(' [ ', PseudoToken)
 
 Execute(ContStr);
 Log matchlist(' "string" ', PseudoToken)
-Log matchlist(' "string\', PseudoToken)
+Log matchlist(" \"string\\\n", PseudoToken)
 Log matchlist(" 'string'  ", PseudoToken)
-Log matchlist(" 'string\\", PseudoToken)
+Log matchlist(" 'string\\\n", PseudoToken)
 
 Execute(Name);
 Log matchlist('      name  ', PseudoToken)

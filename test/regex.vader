@@ -174,9 +174,9 @@ Assert ' ' =~ sd.Whitespace
 Assert '# this is a comment' =~ sd.Comment
 
 Execute(ContStr);
-Assert "'string\\" =~ sd.ContStr
+Assert "'string\\\n" =~ sd.ContStr
 Assert "'string'" =~ sd.ContStr
-Assert '"string\' =~ sd.ContStr
+Assert "\"string\\\n" =~ sd.ContStr
 Assert '"string"' =~ sd.ContStr
 
 Execute(PseudoExtras);

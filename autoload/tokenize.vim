@@ -37,7 +37,7 @@ let s:cookie=s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+")
 " let s:Blank=s:regex('^\s*$')
 
 let s:Whitespace = s:regex("[ \f\t]*")
-let s:Comment = s:regex('#.*')
+let s:Comment = s:regex("#[^\r\n]*")
 let s:Name = s:regex('\w\+')
 
 let s:Hexnumber = s:regex('0[xX]\%(_\=[0-9a-fA-F]\)\+')
@@ -71,15 +71,15 @@ let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '\~'))
 
 let s:Bracket=s:regex('[][(){}]')
-let s:Special=s:regex(s:group('\.\.\.', '[:;.,@]'))
+let s:Special=s:regex(s:group("\n", '\.\.\.', '[:;.,@]'))
 let s:Funny=s:group(s:Operator,s:Bracket,s:Special)
 
 " First (or only) line of ' or " string.
-let s:ContStr=s:group(s:StringPrefix.'''[^''\\]*\%(\\.[^''\\]*\)*'
-            \ .s:group("'", '\\$'),
-            \ s:StringPrefix.'"[^"\\]*\%(\\.[^"\\]*\)*'
-            \ .s:group('"', '\\$'))
-let s:PseudoExtras=s:group('\\$\|\%$', s:Comment, s:Triple)
+let s:ContStr=s:group(s:StringPrefix."'[^'\n\\\\]*\\%(\\\\.[^'\n\\\\]*\\)*"
+            \ .s:group("'", "\\\\\n"),
+            \ s:StringPrefix."\"[^\"\n\\\\]*\\%(\\\\.[^\"\n\\\\]*\\)*"
+            \ .s:group('"', "\\\\\n"))
+let s:PseudoExtras=s:group("\\\\\n\\|\\%$", s:Comment, s:Triple)
 let s:PseudoToken = '^'.s:Whitespace.s:cgroup(
       \ s:PseudoExtras,
       \ s:Number,
@@ -106,6 +106,7 @@ for s:t in s:AllStringPrefixes
 endfor
 
 let s:Tokenizer = {
+      \ 'line': '',
       \ 'async_def': 0,
       \ 'async_def_indent': 0,
       \ 'async_def_nl': 0,
@@ -149,9 +150,26 @@ function! s:Tokenizer._tokenize()
     let self.stashed = 0
     return tok
   endif
-  while 1
 
-    " {{{2
+  while 1
+    " detect indent/dedent
+    if self.cur_indent < self.indents[-1]
+      echo 'pop DEDENT'
+      if index(self.indents, self.cur_indent) < 0
+        throw s:IndentationError(
+              \ "unindent does not match any outer indentation level",
+              \ ["<tokenize>", self.lnum, self.pos, self.line])
+      endif
+      let self.cur_indent = remove(self.indents, -1)
+      if self.async_def && self.async_def_indent >= self.cur_indent
+        let self.async_def = 0
+        let self.async_def_nl = 0
+        let self.async_def_indent = 0
+      endif
+      return s:TokenInfo(s:TokenValue.DEDENT, '', [self.lnum, self.pos],
+            \ [self.lnum, self.pos], self.line)
+    endif
+
     if self.lnum == self.buffer_size
       if self.contstr
         throw s:TokenError("EOF in multi-line string", strstart)
@@ -162,13 +180,13 @@ function! s:Tokenizer._tokenize()
       if len(self.indents) == 1
         let self.error_or_end=1
         return s:TokenInfo(s:TokenValue.ENDMARKER, '', [self.lnum, 0], [self.lnum, 0], '')
+      else
+        unlet self.indents[-1]
+        return s:TokenInfo(s:TokenValue.DEDENT, '',  [self.lnum, 0], [self.lnum, 0], '')
       endif
-      unlet self.indents[-1]
-      return s:TokenInfo(s:TokenValue.DEDENT, '',  [self.lnum, 0], [self.lnum, 0], '')
     endif
-    " }}}2
 
-    if self.pos == self.max || self.contstr
+    if self.contstr || self.pos == self.max
       echo 'Fetch line'
       let self.line=self.buffer_[self.lnum]
       let self.lnum += 1
@@ -185,7 +203,7 @@ function! s:Tokenizer._tokenize()
           let self.needcont = 0
           return s:TokenInfo(s:TokenValue.STRING, join(contstr, "\n"),
                 \ strstart, [self.lnum, end_], join(contline, "\n"))
-        elseif self.needcont && self.line[self.max-1] != '\'
+        elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
           call add(contstr, self.line)
           return s:TokenInfo(s:TokenValue.ERRORTOKEN, join(contstr, "\n"),
@@ -210,43 +228,39 @@ function! s:Tokenizer._tokenize()
           endif
           let self.pos += 1
         endwhile
+
         " skip comments or blank lines
         if self.line[self.pos] == '#'
           let commnet_token = maktaba#string#StripTrailing(self.line[self.pos:])
           let cm_pos = self.pos
-          let self.pos = self.max
-          " stash the NL
+          let self.pos = self.max " end this line
           let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n", [self.lnum, self.max],
                 \ [self.lnum, self.max+1], self.line)
           return s:TokenInfo(s:TokenValue.COMMENT, commnet_token,
                 \ [self.lnum, self.cm_pos], [self.lnum, cm_pos+len(commnet_token)],
                 \ self.line)
+        elseif self.line[self.pos] == "\n"
+          return s:TokenInfo(s:TokenValue.NL, self.line[self.pos:],
+                \ [self.lnum, self.pos], [self.lnum, len(self.line)], self.line)
         endif
+
         if column > self.indents[-1]
+          echo 'push INDENT'
           call add(self.indents, column)
           return s:TokenInfo(s:TokenValue.INDENT, self.line[:self.pos-1],
                 \ [self.lnum, 0], [self.lnum, self.pos], self.line)
+        elseif column < self.indents[-1]
+          let self.cur_indent = column
+          continue " jump to the code that handle dedent
         endif
-        let self.cur_indent = column
       else          " continued statement
         let self.continued = 0
       endif
     endif
 
-    if self.cur_indent < self.indents[-1]
-      echo 'DEDENT pop'
-      if index(self.indents, self.cur_indent) < 0
-        throw s:IndentationError(
-              \ "unindent does not match any outer indentation level",
-              \ ["<tokenize>", self.lnum, self.pos, self.line])
-      endif
-      let self.cur_indent = remove(self.indents, -1)
-      return s:TokenInfo(s:TokenValue.DEDENT, '', [self.lnum, self.pos],
-            \ [self.lnum, self.pos], self.line)
-    endif
-
     echo 'scan for tokens'
-    while self.pos < self.max                    " scan for tokens
+
+    while self.pos < self.max
       let psmat = matchlist(self.line, s:PseudoToken, self.pos)
       if empty(psmat)
         echo 'Bad token'
@@ -255,22 +269,27 @@ function! s:Tokenizer._tokenize()
         let self.pos += 1
         return tok
       endif
+
       let entire = psmat[0]
       let token = psmat[1]
       let self.pos += len(entire)
       if empty(token)
-        echo 'empty token'
         continue
       endif
       let start_ = self.pos-len(token)
       let end_ = self.pos
       let [spos, epos]=[[self.lnum, start_], [self.lnum, end_]]
-
       let initial = token[0]
+
       if initial =~ '[0-9]' ||
             \ (initial == '.' && token != '.' && token != '...')
-        echo 'NUMBER'
         return s:TokenInfo(s:TokenValue.NUMBER, token, spos, epos, self.line)
+      elseif initial == "\n"
+        if self.parenlev > 0
+          return s:TokenInfo(s:TokenValue.NL, token, spos, epos, self.line)
+        else
+          return s:TokenInfo(s:TokenValue.NEWLINE, token, spos, epos, self.line)
+        endif
       elseif initial == '#'
         return s:TokenInfo(s:TokenValue.COMMENT, token, spos, epos, self.line)
       elseif has_key(s:triple_quoted, token)         " check for triple_quoted
@@ -363,6 +382,9 @@ function! s:LineScanner.GetNextToken() abort
     let token = psmat[1]
     let self.pos += len(entire)
     if empty(token)
+      continue
+    endif
+    if token is "\n"
       return [s:TokenValue.NL, "\n", [self.pos, self.pos+1]]
     endif
     let loc_ = [self.pos-len(token), self.pos]
@@ -394,17 +416,21 @@ function! s:Tokenizer.GetNextToken() abort
   endif
   try
     let val=self._tokenize()
-  catch
+    return val
+  catch /^Vim(.*):E\d\+:/
+    echo v:exception
+    echoerr 'VimError'
+  catch /^\w\+/
     let self.error_or_end=1
     throw v:exception
   endtry
-  return val
 endfunction
 
 function! tokenize#FromFile(path)
   let t_=deepcopy(s:Tokenizer)
-  let t_.buffer_=readfile(a:path)
-  let t_.buffer_size=len(t_.buffer_)
+  let b=readfile(a:path)
+  let t_.buffer_=map(b, 'v:val."\n"')
+  let t_.buffer_size=len(b)
   return t_
 endfunction
 
