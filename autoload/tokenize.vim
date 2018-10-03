@@ -201,13 +201,13 @@ function! s:Tokenizer._tokenize()
           call add(contline, self.line)
           let self.contstr = 0
           let self.needcont = 0
-          return s:TokenInfo(s:TokenValue.STRING, join(contstr, "\n"),
-                \ strstart, [self.lnum, end_], join(contline, "\n"))
+          return s:TokenInfo(s:TokenValue.STRING, join(contstr, ''),
+                \ strstart, [self.lnum, end_], join(contline, ''))
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
           call add(contstr, self.line)
-          return s:TokenInfo(s:TokenValue.ERRORTOKEN, join(contstr, "\n"),
-                \ strstart, [self.lnum, len(self.line)], join(contline, "\n"))
+          return s:TokenInfo(s:TokenValue.ERRORTOKEN, join(contstr, ''),
+                \ strstart, [self.lnum, len(self.line)], join(contline, ''))
         else
           call add(contstr, self.line)
           call add(contline, self.line)

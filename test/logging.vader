@@ -1,0 +1,15 @@
+Execute(get_logger);
+let lg=tokenize#logging#get_logger('./test/test_logging')
+let lg.log_to_stderr = 1
+let lg.filename = g:vader_file
+let lg.min_level = tokenize#logging#Level.INFO
+
+call lg.info('this is an info')
+call lg.error('this is an error')
+call lg.debug_('this is a debug')
+call lg.warning('this is a warning')
+call lg.shutdown()
+
+for line in readfile(lg.dest)
+  Log line
+endfor
