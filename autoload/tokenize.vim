@@ -162,29 +162,29 @@ function! s:Tokenizer._tokenize()
               \ "unindent does not match any outer indentation level",
               \ ["<tokenize>", self.lnum, self.pos, self.line])
       endif
-      let self.cur_indent = remove(self.indents, -1)
+      unlet self.indents[-1]
       return s:TokenInfo(s:TokenValue.DEDENT, '', [self.lnum, self.pos],
             \ [self.lnum, self.pos], self.line)
     endif
 
-    if self.lnum == self.buffer_size && self.pos == self.max
+    if self.lnum >= self.buffer_size && self.pos >= self.max
       if self.contstr
         throw s:TokenError("EOF in multi-line string", strstart)
       endif
       if self.continued
         throw s:TokenError("EOF in mult-line statement", [self.lnum, 0])
       endif
+      let last_line = self.buffer_size + 1
       if len(self.indents) == 1
         let self.error_or_end=1
-        return s:TokenInfo(s:TokenValue.ENDMARKER, '', [self.lnum, 0], [self.lnum, 0], '')
+        return s:TokenInfo(s:TokenValue.ENDMARKER, '', [last_line, 0], [last_line, 0], '')
       else
         unlet self.indents[-1]
-        return s:TokenInfo(s:TokenValue.DEDENT, '',  [self.lnum, 0], [self.lnum, 0], '')
+        return s:TokenInfo(s:TokenValue.DEDENT, '',  [last_line, 0], [last_line, 0], '')
       endif
     endif
 
-    if self.contstr || self.pos == self.max
-      call self.logger.debug_('Fetch line')
+    if self.contstr || self.pos >= self.max
       let self.line=self.buffer_[self.lnum]
       let self.lnum += 1
       let [self.pos, self.max]=[0, len(self.line)]
@@ -211,7 +211,6 @@ function! s:Tokenizer._tokenize()
           continue
         endif
       elseif self.parenlev == 0 && !self.continued " new statement
-        call self.logger.debug_('new statement')
         let column = 0
         while self.pos < self.max
           if self.line[self.pos] == ' '
@@ -248,13 +247,13 @@ function! s:Tokenizer._tokenize()
           endif
         endif
 
+        let self.cur_indent = column
         if column > self.indents[-1]
           call self.logger.debug_('push INDENT')
           call add(self.indents, column)
           return s:TokenInfo(s:TokenValue.INDENT, self.line[:self.pos-1],
                 \ [self.lnum, 0], [self.lnum, self.pos], self.line)
         elseif column < self.indents[-1]
-          let self.cur_indent = column
           continue " jump to the code that handle dedent
         endif
       else          " continued statement
@@ -262,12 +261,10 @@ function! s:Tokenizer._tokenize()
       endif
     endif
 
-    call self.logger.debug_('scan for tokens')
 
     while self.pos < self.max
       let psmat = matchlist(self.line, s:PseudoToken, self.pos)
       if empty(psmat)
-        call self.logger.debug_('Bad token')
         let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN, self.line[self.pos],
               \ [self.lnum, self.pos], [self.lnum, self.pos+1], self.line)
         let self.pos += 1
@@ -313,7 +310,6 @@ function! s:Tokenizer._tokenize()
       elseif (has_key(s:single_quoted, initial) ||
             \ has_key(s:single_quoted, token[:1]) ||
             \ has_key(s:single_quoted, token[:2]))
-        call self.logger.debug_('single_quoted prefix')
         if self.line[end_ - 1] == '\'
           let strstart = [self.lnum, start_]
           let endprog = get(s:endpats, initial,
@@ -332,9 +328,11 @@ function! s:Tokenizer._tokenize()
       elseif initial == '\'
         let self.continued = 1
       else
-        if initial =~ '[([{]'
+        if initial =~ '[(\[{]'
+          call self.logger.debug_('Left Bracket')
           let self.parenlev += 1
-        elseif initial =~ '[)]}'
+        elseif initial =~ '[)}\]]'
+          call self.logger.debug_('Right Bracket')
           let self.parenlev -= 1
         endif
         return s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)

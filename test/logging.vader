@@ -8,7 +8,7 @@ call lg.info('this is an info')
 call lg.error('this is an error')
 call lg.debug_('this is a debug')
 call lg.warning('this is a warning')
-call lg.shutdown()
+call lg.flush()
 
 for line in readfile(lg.dest)
   Log line
