@@ -232,8 +232,8 @@ function! s:Tokenizer._tokenize()
           if self.line[start_] == '#'
             let commnet_token = maktaba#string#StripTrailing(self.line[start_:])
             let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n",
-                  \ [self.lnum, self.max],
-                  \ [self.lnum, self.max+1], self.line)
+                  \ [self.lnum, self.max-1],
+                  \ [self.lnum, self.max], self.line)
             return s:TokenInfo(s:TokenValue.COMMENT,
                   \ commnet_token,
                   \ [self.lnum, start_],
@@ -299,7 +299,9 @@ function! s:Tokenizer._tokenize()
         if !empty(endmatch)
           " all in one line
           let self.pos += len(endmatch[0])
-          return s:TokenInfo(s:TokenValue.STRING, token, spos, [self.lnum, self.pos], self.line)
+          let token = self.line[start_: self.pos-1]
+          return s:TokenInfo(s:TokenValue.STRING,
+                \ token, spos, [self.lnum, self.pos], self.line)
         else " multiple lines
           let strstart = [self.lnum, start_]
           let contstr = [self.line[start_:]]
@@ -412,6 +414,8 @@ function! tokenize#FromFile(path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
   let t_.logger = tokenize#logging#get_logger('./test/tokenize.log')
+  let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
+        \ [0, 0], [0, 0], '')
   let t_.logger.filename = s:__file__
   " let t_.logger.log_to_stderr = 1
   return t_
@@ -426,11 +430,23 @@ let s:escapes = {
       \ "\t": '\t',
       \ "'": '\''',
       \ "\\": '\\',
+      \ '"': '\"',
       \}
 
 function! tokenize#dump(str)
-  return "'". substitute(a:str, "[\001-\037\\\\']",
-        \  '\=get(s:escapes, submatch(0))', 'g')."'"
+  " If only has single, use double quote, "'".
+  " If only has double, use single quote, '"'.
+  " If has both, use single quote, escape single quotes, '\'"'.
+  if a:str =~ '"' && a:str !~ "'"
+    return printf("'%s'", substitute(a:str, "[\001-\037\\\\]",
+        \  '\=get(s:escapes, submatch(0))', 'g'))
+  elseif a:str =~ "'" && a:str !~ '"'
+    return printf('"%s"', substitute(a:str, "[\001-\037\\\\]",
+        \  '\=get(s:escapes, submatch(0))', 'g'))
+  else
+    return printf("'%s'", substitute(a:str, "[\001-\037\\\\']",
+          \  '\=get(s:escapes, submatch(0))', 'g'))
+  endif
 endfunction
 
 function! tokenize#main(path, out, exact)
