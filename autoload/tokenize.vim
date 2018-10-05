@@ -156,7 +156,6 @@ function! s:Tokenizer._tokenize()
   while 1
     " detect indent/dedent
     if self.cur_indent < self.indents[-1]
-      call self.logger.debug_('pop DEDENT')
       if index(self.indents, self.cur_indent) < 0
         throw s:IndentationError(
               \ "unindent does not match any outer indentation level",
@@ -249,7 +248,6 @@ function! s:Tokenizer._tokenize()
 
         let self.cur_indent = column
         if column > self.indents[-1]
-          call self.logger.debug_('push INDENT')
           call add(self.indents, column)
           return s:TokenInfo(s:TokenValue.INDENT, self.line[:self.pos-1],
                 \ [self.lnum, 0], [self.lnum, self.pos], self.line)
@@ -331,10 +329,8 @@ function! s:Tokenizer._tokenize()
         let self.continued = 1
       else
         if initial =~ '[(\[{]'
-          call self.logger.debug_('Left Bracket')
           let self.parenlev += 1
         elseif initial =~ '[)}\]]'
-          call self.logger.debug_('Right Bracket')
           let self.parenlev -= 1
         endif
         return s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)
