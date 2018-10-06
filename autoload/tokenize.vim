@@ -117,6 +117,8 @@ let s:Tokenizer = {
       \ 'continued': 0,
       \ 'stashed': 0,
       \ 'pos': 0,
+      \ 'cpos': 0,
+      \ 'cmax': 0,
       \ 'max': 0,
       \ 'cur_indent': 0,
       \ 'error_or_end': 0,
@@ -159,11 +161,12 @@ function! s:Tokenizer._tokenize()
       if index(self.indents, self.cur_indent) < 0
         throw s:IndentationError(
               \ "unindent does not match any outer indentation level",
-              \ ["<tokenize>", self.lnum, self.pos, self.line])
+              \ ["<tokenize>", self.lnum, self.cpos, self.line])
       endif
       unlet self.indents[-1]
-      return s:TokenInfo(s:TokenValue.DEDENT, '', [self.lnum, self.pos],
-            \ [self.lnum, self.pos], self.line)
+      return s:TokenInfo(s:TokenValue.DEDENT, '',
+            \ [self.lnum, self.cpos],
+            \ [self.lnum, self.cpos], self.line)
     endif
 
     if self.lnum >= self.buffer_size && self.pos >= self.max
@@ -175,7 +178,7 @@ function! s:Tokenizer._tokenize()
       endif
       let last_line = self.buffer_size + 1
       if len(self.indents) == 1
-        let self.error_or_end=1
+        let self.error_or_end = 1
         return s:TokenInfo(s:TokenValue.ENDMARKER, '', [last_line, 0], [last_line, 0], '')
       else
         unlet self.indents[-1]
@@ -186,24 +189,28 @@ function! s:Tokenizer._tokenize()
     if self.contstr || self.pos >= self.max
       let self.line=self.buffer_[self.lnum]
       let self.lnum += 1
-      let [self.pos, self.max]=[0, len(self.line)]
+      let [self.pos, self.max] = [0, len(self.line)]
+      let [self.cpos, self.cmax] = [0, strchars(self.line)]
 
       if self.contstr
         let endmatch = matchlist(self.line, endprog)
-        if !empty(endmatch)
+        if !empty(endmatch)     " continued string ends
           let self.pos = len(endmatch[0])
+          let self.cpos = strchars(endmatch[0])
           let end_ = self.pos
           call add(contstr, self.line[:end_-1])
           call add(contline, self.line)
           let self.contstr = 0
           let self.needcont = 0
-          return s:TokenInfo(s:TokenValue.STRING, join(contstr, ''),
-                \ strstart, [self.lnum, end_], join(contline, ''))
+          return s:TokenInfo(s:TokenValue.STRING,
+                \ join(contstr, ''), strstart,
+                \ [self.lnum, self.cpos], join(contline, ''))
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
           call add(contstr, self.line)
-          return s:TokenInfo(s:TokenValue.ERRORTOKEN, join(contstr, ''),
-                \ strstart, [self.lnum, len(self.line)], join(contline, ''))
+          return s:TokenInfo(s:TokenValue.ERRORTOKEN,
+                \ join(contstr, ''), strstart,
+                \ [self.lnum, self.cmax)], join(contline, ''))
         else
           call add(contstr, self.line)
           call add(contline, self.line)
@@ -217,31 +224,33 @@ function! s:Tokenizer._tokenize()
           elseif self.line[self.pos] == "\t"
             let column = (column / s:TAB_SIZE + 1) * s:TAB_SIZE
           elseif self.line[self.pos] == "\f"
-            let column=0
+            let column = 0
           else
             break
           endif
+          let self.cpos += 1
           let self.pos += 1
         endwhile
 
         " skip comments or blank lines
+        " TODO: detect this before counting indent, maybe faster?
         if self.line[self.pos] =~ "[#\n]"
           let start_ = self.pos
           let self.pos = self.max " end this line, do not scan token
           if self.line[start_] == '#'
             let commnet_token = maktaba#string#StripTrailing(self.line[start_:])
             let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n",
-                  \ [self.lnum, self.max-1],
-                  \ [self.lnum, self.max], self.line)
+                  \ [self.lnum, self.cmax - 1],
+                  \ [self.lnum, self.cmax], self.line)
             return s:TokenInfo(s:TokenValue.COMMENT,
                   \ commnet_token,
-                  \ [self.lnum, start_],
-                  \ [self.lnum, start_+len(commnet_token)],
+                  \ [self.lnum, self.cpos],
+                  \ [self.lnum, self.cpos + strchars(commnet_token)],
                   \ self.line)
           else
             return s:TokenInfo(s:TokenValue.NL, "\n",
-                  \ [self.lnum, start_],
-                  \ [self.lnum, start_+1],
+                  \ [self.lnum, self.cmax - 1],
+                  \ [self.lnum, self.cmax],
                   \ self.line)
           endif
         endif
@@ -249,8 +258,9 @@ function! s:Tokenizer._tokenize()
         let self.cur_indent = column
         if column > self.indents[-1]
           call add(self.indents, column)
-          return s:TokenInfo(s:TokenValue.INDENT, self.line[:self.pos-1],
-                \ [self.lnum, 0], [self.lnum, self.pos], self.line)
+          return s:TokenInfo(s:TokenValue.INDENT,
+                \ self.line[:self.pos - 1],
+                \ [self.lnum, 0], [self.lnum, self.cpos], self.line)
         elseif column < self.indents[-1]
           continue " jump to the code that handle dedent
         endif
@@ -259,25 +269,28 @@ function! s:Tokenizer._tokenize()
       endif
     endif
 
-
     while self.pos < self.max
       let psmat = matchlist(self.line, s:PseudoToken, self.pos)
       if empty(psmat)
         let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN, self.line[self.pos],
-              \ [self.lnum, self.pos], [self.lnum, self.pos+1], self.line)
+              \ [self.lnum, self.cpos],
+              \ [self.lnum, self.cpos + 1], self.line)
         let self.pos += 1
+        let self.cpos += 1
         return tok
       endif
 
       let entire = psmat[0]
       let token = psmat[1]
       let self.pos += len(entire)
+      let self.cpos += strchars(entire)
       if empty(token)
         continue
       endif
-      let start_ = self.pos-len(token)
+      let start_ = self.pos - len(token)
       let end_ = self.pos
-      let [spos, epos]=[[self.lnum, start_], [self.lnum, end_]]
+      let spos = [self.lnum, self.cpos - strchars(token)]
+      let epos = [self.lnum, self.cpos]
       let initial = token[0]
 
       if initial =~ '[0-9]' ||
@@ -297,11 +310,12 @@ function! s:Tokenizer._tokenize()
         if !empty(endmatch)
           " all in one line
           let self.pos += len(endmatch[0])
+          let self.cpos += strchars(endmatch[0])
           let token = self.line[start_: self.pos-1]
           return s:TokenInfo(s:TokenValue.STRING,
-                \ token, spos, [self.lnum, self.pos], self.line)
+                \ token, spos, [self.lnum, self.cpos], self.line)
         else " multiple lines
-          let strstart = [self.lnum, start_]
+          let strstart = spos
           let contstr = [self.line[start_:]]
           let contline = [self.line]
           let self.contstr = 1
@@ -311,7 +325,7 @@ function! s:Tokenizer._tokenize()
             \ has_key(s:single_quoted, token[:1]) ||
             \ has_key(s:single_quoted, token[:2]))
         if self.line[end_ - 1] == '\'
-          let strstart = [self.lnum, start_]
+          let strstart = spos
           let endprog = get(s:endpats, initial,
                 \ get(s:endpats, token[1],
                 \ get(s:endpats, token[2])))
@@ -321,7 +335,7 @@ function! s:Tokenizer._tokenize()
           let contline = [self.line]
           break
         else
-          return s:TokenInfo(s:TokenValue.STRING, token, spos, [self.lnum, self.pos], self.line)
+          return s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
         endif
       elseif initial =~ '[a-zA-Z_]'
         return s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
@@ -343,6 +357,7 @@ endfunction
 let s:LineScanner = {
       \ 'line': 0,
       \ 'pos': 0,
+      \ 'cpos': 0,
       \ 'max': 0,
       \ }
 
@@ -354,6 +369,7 @@ function! s:LineScanner.GetNextToken() abort
     let psmat = matchlist(self.line, s:PseudoToken, self.pos)
     if empty(psmat)
       let self.pos += 1
+      let self.cpos += 1
       return [s:TokenValue.ERRORTOKEN, self.line[self.pos-1], [self.pos-1, self.pos]]
     endif
     let entire = psmat[0]
@@ -409,7 +425,7 @@ function! tokenize#FromFile(path)
   let b=readfile(a:path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
-  let t_.logger = tokenize#logging#get_logger('./test/tokenize.log')
+  let t_.logger = tokenize#logging#get_logger(tempname())
   let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
   let t_.logger.filename = s:__file__
