@@ -471,7 +471,7 @@ function! tokenize#main(path, out, exact)
       if tk[0] == s:TokenValue.OP && a:exact
         let tk[0] = s:ExactType[tk[1]]
       endif
-      call add(val, printf('%-20s%-15s%-15s', token_range,
+      call add(val, printf('%-20s%-15s%-15S', token_range,
             \ s:TokenName[tk[0]], tokenize#dump(tk[1])))
     endwhile
   catch 'StopIteration'
