@@ -238,7 +238,7 @@ function! s:Tokenizer._tokenize()
           let start_ = self.pos
           let self.pos = self.max " end this line, do not scan token
           if self.line[start_] == '#'
-            let commnet_token = maktaba#string#StripTrailing(self.line[start_:])
+            let commnet_token = self.line[start_ : -2]
             let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n",
                   \ [self.lnum, self.cmax - 1],
                   \ [self.lnum, self.cmax], self.line)
