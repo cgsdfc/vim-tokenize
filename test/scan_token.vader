@@ -1,31 +1,31 @@
 Execute(NL);
-call tokenize#ScanLine('           ')
-call tokenize#ScanLine("           \n")
+call tokenize#helper#ScanLine('           ')
+call tokenize#helper#ScanLine("           \n")
 
 Execute(Number);
-call tokenize#ScanLine(' 0b01_01 .1 2.1 3.e4 0x12 '."\n")
+call tokenize#helper#ScanLine(' 0b01_01 .1 2.1 3.e4 0x12 '."\n")
 
 Execute(Name);
-call tokenize#ScanLine(' name name name '."\n")
+call tokenize#helper#ScanLine(' name name name '."\n")
 
 Execute(Operator);
-call tokenize#ScanLine(' >>= @ @= += - * '."\n")
+call tokenize#helper#ScanLine(' >>= @ @= += - * '."\n")
 
 Execute(Bracket);
-call tokenize#ScanLine(' [ { ( ) } ] '."\n")
+call tokenize#helper#ScanLine(' [ { ( ) } ] '."\n")
 
 Execute(Special);
-call tokenize#ScanLine(' ; : ... . , @'."\n")
-call tokenize#ScanLine("   \n")
+call tokenize#helper#ScanLine(' ; : ... . , @'."\n")
+call tokenize#helper#ScanLine("   \n")
 
 Execute(Error FIXME);
-call tokenize#ScanLine(' $ ? ` ')
+call tokenize#helper#ScanLine(' $ ? ` ')
 
 Execute(ContStr);
-call tokenize#ScanLine(' "string"                    ')
-call tokenize#ScanLine(' ''string''         ')
-call tokenize#ScanLine(" \"string\\\n")
+call tokenize#helper#ScanLine(' "string"                    ')
+call tokenize#helper#ScanLine(' ''string''         ')
+call tokenize#helper#ScanLine(" \"string\\\n")
 
 Execute(PseudoExtras);
-call tokenize#ScanLine('  # comment'."\n")
-call tokenize#ScanLine('b"""'."\n")
+call tokenize#helper#ScanLine('  # comment'."\n")
+call tokenize#helper#ScanLine('b"""'."\n")

@@ -21,10 +21,6 @@ function! s:group(...) abort
   return '\%('.join(a:000, '\|').'\)'
 endfunction
 
-" function! s:any(...) abort
-"   return call('s:group', a:000).'*'
-" endfunction
-
 function! s:maybe(...) abort
   return call('s:group', a:000).'\='
 endfunction
@@ -60,10 +56,6 @@ let s:Single3=s:regex('[^''\\]*\%(\%(\\.\|''\%(''''\)\@!\)[^''\\]*\)*''''''')
 let s:Double3=s:regex('[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""')
 let s:StringPrefix = s:regex(s:lgroup(s:AllStringPrefixes))
 let s:Triple=s:group(s:StringPrefix."'''", s:StringPrefix.'"""')
-
-" let s:String=s:group(s:StringPrefix.
-"       \ '''[^'."\n".'''\\]*\%(\\.[^'."\n".'''\\]*\)*''',
-"       \ s:StringPrefix.'"[^'."\n".'"\\]*\%(\\.[^'."\n".'"\\]*\)*"')
 
 let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '//=\?', '->',
@@ -109,11 +101,6 @@ function! tokenize#scriptdict()
   return s:
 endfunction
 
-" function! tokenize#detect_encoding(readline) abort
-"   let line=a:readline()
-"   let match=matchlist(line, s:cookie)[1]
-" endfunction
-
 function! s:IndentationError(msg, args)
   return a:msg
 endfunction
@@ -138,7 +125,7 @@ function! tokenize#GetNextToken() dict abort
               \ ["<tokenize>", self.lnum, self.cpos, self.line])
       endif
       unlet self.indents[-1]
-      if self.async_def && self.async_def_indent > self.indents[-1]
+      if self.async_def && self.async_def_indent >= self.indents[-1]
         let self.async_def = 0
         let self.async_def_nl = 0
         let self.async_def_indent = 0
@@ -150,7 +137,7 @@ function! tokenize#GetNextToken() dict abort
       return tok
     endif
 
-    if self.async_def && self.async_def_indent > self.indents[-1]
+    if self.async_def && self.async_def_nl && self.async_def_indent >= self.indents[-1]
       let self.async_def = 0
       let self.async_def_nl = 0
       let self.async_def_indent = 0
@@ -354,56 +341,6 @@ function! tokenize#GetNextToken() dict abort
 endfunction
 " }}}1
 
-let s:LineScanner = {
-      \ 'line': 0,
-      \ 'pos': 0,
-      \ 'cpos': 0,
-      \ 'max': 0,
-      \ }
-
-function! s:LineScanner.GetNextToken() abort
-  while 1
-    if self.pos == self.max
-      throw 'StopIteration'
-    endif
-    let psmat = matchlist(self.line, s:PseudoToken, self.pos)
-    if empty(psmat)
-      let self.pos += 1
-      let self.cpos += 1
-      return [s:TokenValue.ERRORTOKEN, self.line[self.pos-1], [self.pos-1, self.pos]]
-    endif
-    let entire = psmat[0]
-    let token = psmat[1]
-    let self.pos += len(entire)
-    if empty(token)
-      continue
-    endif
-    if token is "\n"
-      return [s:TokenValue.NL, "\n", [self.pos, self.pos+1]]
-    endif
-    let loc_ = [self.pos-len(token), self.pos]
-    return [s:TokenValue.OP, token, loc_]
-  endwhile
-endfunction
-
-function! tokenize#ScanLine(line) abort
-  let lineScanner = deepcopy(s:LineScanner)
-  let lineScanner.line = a:line
-  let lineScanner.max = len(a:line)
-  let out = []
-  try
-    while 1
-      let val = lineScanner.GetNextToken()
-      let loc_ = call('printf', ['%d,%d:']+val[2])
-      let str = printf('%-20s%-15s%-15s', loc_, s:TokenName[val[0]],
-            \ tokenize#dump(val[1]))
-      Log str
-    endwhile
-  catch 'StopIteration'
-    return out
-  endtry
-endfunction
-
 let s:Tokenizer = {
       \ 'blank': 0,
       \ 'line': '',
@@ -428,7 +365,7 @@ let s:Tokenizer = {
       \ 'parenlev': 0,
       \ 'indents': [0],
       \ 'GetNextToken': function('tokenize#GetNextToken'),
-      \ }
+      \}
 
 function! tokenize#FromFile(path)
   let t_=deepcopy(s:Tokenizer)
@@ -436,8 +373,6 @@ function! tokenize#FromFile(path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
   let t_.logger = tokenize#logging#get_logger('./test/tokenize.log1')
-  " TODO: We can check self.lnum == 0 at the beginning of the
-  " tokenize loop to return the encoding token.
   let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
   let t_.logger.filename = s:__file__
