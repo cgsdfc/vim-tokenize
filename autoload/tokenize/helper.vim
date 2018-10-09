@@ -51,10 +51,11 @@ def diff_batch(files, logger):
 def test_tokenize(dir_):
     '''Test tokenize() using all py files in dir_'''
     logger = logging.getLogger('test_tokenize')
-    handler = logging.FileHandler('/home/cgsdfc/Vimscripts/vim-tokenize/test/tokenize.log', mode='w')
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    logger.debug('py files from %s', dir_)
+    fh = logging.FileHandler('/home/cgsdfc/Vimscripts/vim-tokenize/test/tokenize.log', mode='w')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    fh.setLevel(logging.DEBUG)
+    logger.addHandler(fh)
     files = filenames_from_dir(dir_)
     return diff_batch(files, logger)
 

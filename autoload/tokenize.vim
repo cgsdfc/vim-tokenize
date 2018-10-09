@@ -146,9 +146,7 @@ function! tokenize#GetNextToken() dict abort
       let tok = s:TokenInfo(s:TokenValue.DEDENT, '',
             \ [self.lnum, self.cpos],
             \ [self.lnum, self.cpos], self.line)
-      if self.stashed isnot 0
-        let [tok, self.stashed] = [self.stashed, tok]
-      endif
+      let [tok, self.stashed] = [self.stashed, tok]
       return tok
     endif
 
@@ -200,9 +198,7 @@ function! tokenize#GetNextToken() dict abort
           let tok = s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cpos], join(contline, ''))
-          if self.stashed isnot 0
-            let [tok, self.stashed] = [self.stashed, tok]
-          endif
+          let [tok, self.stashed] = [self.stashed, tok]
           return tok
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
@@ -210,9 +206,7 @@ function! tokenize#GetNextToken() dict abort
           let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cmax)], join(contline, ''))
-          if self.stashed isnot 0
-            let [tok, self.stashed] = [self.stashed, tok]
-          endif
+          let [tok, self.stashed] = [self.stashed, tok]
           return tok
         else
           call add(contstr, self.line)
@@ -243,9 +237,7 @@ function! tokenize#GetNextToken() dict abort
             let tok = s:TokenInfo(s:TokenValue.INDENT,
                   \ self.line[:self.pos - 1],
                   \ [self.lnum, 0], [self.lnum, self.cpos], self.line)
-            if self.stashed isnot 0
-              let [tok, self.stashed] = [self.stashed, tok]
-            endif
+            let [tok, self.stashed] = [self.stashed, tok]
             return tok
           elseif column < self.indents[-1]
             continue " jump to the code that handle dedent
@@ -264,6 +256,7 @@ function! tokenize#GetNextToken() dict abort
               \ [self.lnum, self.cpos + 1], self.line)
         let self.pos += 1
         let self.cpos += 1
+        let [tok, self.stashed] = [self.stashed, tok]
         return tok
       endif
 
@@ -329,20 +322,13 @@ function! tokenize#GetNextToken() dict abort
           let tok = s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
         endif
       elseif initial =~ '[a-zA-Z_]' " isidentifier()
-        if token ==# 'async' || token ==# 'await'
-          if self.async_def
-            let tok = s:TokenInfo(token == 'async' ?
-                  \ s:TokenValue.ASYNC : s:TokenValue.AWAIT,
-                  \ token, spos, epos, self.line)
-          endif
-        endif
-        let tok = s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
-        if token ==# 'async' && self.stashed is 0
-          let self.stashed = tok
-          continue
-        endif
-        if token ==# 'def'
-          if self.stashed isnot 0 &&
+        if token =~# '\m\c^\(async\|await\)$' && self.async_def
+          let tok = s:TokenInfo(token == 'async' ?
+                \ s:TokenValue.ASYNC : s:TokenValue.AWAIT,
+                \ token, spos, epos, self.line)
+        else
+          let tok = s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
+          if token ==# 'def' &&
                 \ self.stashed[0] == s:TokenValue.NAME &&
                 \ self.stashed[1] ==# 'async'
             let self.async_def = 1
@@ -361,9 +347,7 @@ function! tokenize#GetNextToken() dict abort
         endif
         let tok = s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)
       endif
-      if self.stashed isnot 0
-        let [tok, self.stashed] = [self.stashed, tok]
-      endif
+      let [tok, self.stashed] = [self.stashed, tok]
       return tok
     endwhile
   endwhile
