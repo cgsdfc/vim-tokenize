@@ -432,6 +432,11 @@ function! tokenize#main(path, out, exact)
             \ s:TokenName[type], tokenize#dump(tk[1])))
     endwhile
   catch 'StopIteration'
+    if a:out ==# '<stdout>'
+      echo join(val, "\n")
+    else
+      call writefile(val, a:out)
+    endif
   catch
     echohl ERROR
     echo v:exception
@@ -440,11 +445,6 @@ function! tokenize#main(path, out, exact)
   finally
     call tknr.logger.flush()
   endtry
-  if a:out ==# '<stdout>'
-    echo join(val, "\n")
-  else
-    call writefile(val, a:out)
-  endif
 endfunction
 
 " vim:set fdm=markers

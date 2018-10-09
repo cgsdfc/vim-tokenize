@@ -6,11 +6,11 @@ import vim
 import os
 __file__ = vim.eval('s:__file__')
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from tools.test import test_tokenize
+from tools.test import test_tokenize, run_and_diff
 EOF
 
 function! tokenize#helper#test_tokenize(dir_) abort
-  return py3eval('test_tokenize('.string(a:dir_).')')
+  return py3eval('test_tokenize()')
 endfunction
 
 function! tokenize#helper#vim_tokenize(path) abort
@@ -26,12 +26,14 @@ function! tokenize#helper#vim_tokenize(path) abort
 endfunction
 
 function! tokenize#helper#run_and_diff(path) abort
-    let out = './out'
-    let OUT = './OUT'
-    call system('python3 -m tokenize -e '.a:path.' >'.OUT)
-    call tokenize#main(a:path, out, 1)
-    execute 'tabnew' out
-    execute 'diffsplit' OUT
+  let files = py3eval('run_and_diff()')
+  let [vout, pout] = files
+  execute 'tabnew' vout
+  execute 'diffsplit' pout
+  nnoremap q :tabclose
+  for out in files
+    call delete(out)
+  endfor
 endfunction
 
 let s:TokenValue=tokenize#token#Value
