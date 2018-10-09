@@ -34,8 +34,7 @@ function! s:TokenInfo(type, string, start_, end_, line)
 endfunction
 
 let s:cookie=s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+")
-" let s:blank=s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
-" let s:Blank=s:regex('^\s*$')
+let s:Blank=s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
 
 let s:Whitespace = s:regex("[ \f\t]*")
 let s:Comment = s:regex("#[^\r\n]*")
@@ -106,30 +105,6 @@ for s:t in s:AllStringPrefixes
   let s:triple_quoted[s:t."'''"]=1
 endfor
 
-" stashed: right after storing a tok into stashed, function must return!
-let s:Tokenizer = {
-      \ 'line': '',
-      \ 'async_def': 0,
-      \ 'async_def_indent': 0,
-      \ 'async_def_nl': 0,
-      \ 'contstr': 0,
-      \ 'needcont': 0,
-      \ 'continued': 0,
-      \ 'stashed': 0,
-      \ 'pos': 0,
-      \ 'cpos': 0,
-      \ 'cmax': 0,
-      \ 'max': 0,
-      \ 'cur_indent': 0,
-      \ 'error_or_end': 0,
-      \ 'bol': 1,
-      \ 'buffer_': 0,
-      \ 'buffer_size': 0,
-      \ 'lnum': 0,
-      \ 'parenlev': 0,
-      \ 'indents': [0],
-      \ }
-
 function! tokenize#scriptdict()
   return s:
 endfunction
@@ -148,33 +123,53 @@ function! s:TokenError(msg, args)
 endfunction
 
 " {{{1
-function! s:Tokenizer._tokenize()
-  if self.stashed isnot 0
-    let tok=self.stashed
-    let self.stashed = 0
-    return tok
+function! tokenize#GetNextToken() dict abort
+  if self.error_or_end
+    throw 'StopIteration'
   endif
 
   while 1
     " detect indent/dedent
     if self.cur_indent < self.indents[-1]
       if index(self.indents, self.cur_indent) < 0
+        let self.error_or_end = 1
         throw s:IndentationError(
               \ "unindent does not match any outer indentation level",
               \ ["<tokenize>", self.lnum, self.cpos, self.line])
       endif
       unlet self.indents[-1]
-      return s:TokenInfo(s:TokenValue.DEDENT, '',
+      if self.async_def && self.async_def_indent > self.indents[-1]
+        let self.async_def = 0
+        let self.async_def_nl = 0
+        let self.async_def_indent = 0
+      endif
+      let tok = s:TokenInfo(s:TokenValue.DEDENT, '',
             \ [self.lnum, self.cpos],
             \ [self.lnum, self.cpos], self.line)
+      if self.stashed isnot 0
+        let [tok, self.stashed] = [self.stashed, tok]
+      endif
+      return tok
+    endif
+
+    if self.async_def && self.async_def_indent > self.indents[-1]
+      let self.async_def = 0
+      let self.async_def_nl = 0
+      let self.async_def_indent = 0
     endif
 
     if self.lnum >= self.buffer_size && self.pos >= self.max
       if self.contstr
+        let self.error_or_end = 1
         throw s:TokenError("EOF in multi-line string", strstart)
       endif
       if self.continued
+        let self.error_or_end = 1
         throw s:TokenError("EOF in mult-line statement", [self.lnum, 0])
+      endif
+      if self.stashed isnot 0
+        let [tok, self.stashed] = [self.stashed, 0]
+        return tok
       endif
       let last_line = self.buffer_size + 1
       if len(self.indents) == 1
@@ -202,67 +197,59 @@ function! s:Tokenizer._tokenize()
           call add(contline, self.line)
           let self.contstr = 0
           let self.needcont = 0
-          return s:TokenInfo(s:TokenValue.STRING,
+          let tok = s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cpos], join(contline, ''))
+          if self.stashed isnot 0
+            let [tok, self.stashed] = [self.stashed, tok]
+          endif
+          return tok
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
           call add(contstr, self.line)
-          return s:TokenInfo(s:TokenValue.ERRORTOKEN,
+          let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cmax)], join(contline, ''))
+          if self.stashed isnot 0
+            let [tok, self.stashed] = [self.stashed, tok]
+          endif
+          return tok
         else
           call add(contstr, self.line)
           call add(contline, self.line)
           continue
         endif
       elseif self.parenlev == 0 && !self.continued " new statement
-        let column = 0
-        while self.pos < self.max
-          if self.line[self.pos] == ' '
-            let column += 1
-          elseif self.line[self.pos] == "\t"
-            let column = (column / s:TAB_SIZE + 1) * s:TAB_SIZE
-          elseif self.line[self.pos] == "\f"
-            let column = 0
-          else
-            break
+        if self.line =~ s:Blank
+          let self.blank = 1
+        else
+          let column = 0
+          while self.pos < self.max
+            if self.line[self.pos] == ' '
+              let column += 1
+            elseif self.line[self.pos] == "\t"
+              let column = (column / s:TAB_SIZE + 1) * s:TAB_SIZE
+            elseif self.line[self.pos] == "\f"
+              let column = 0
+            else
+              break
+            endif
+            let self.cpos += 1
+            let self.pos += 1
+          endwhile
+          let self.cur_indent = column
+          if column > self.indents[-1]
+            call add(self.indents, column)
+            let tok = s:TokenInfo(s:TokenValue.INDENT,
+                  \ self.line[:self.pos - 1],
+                  \ [self.lnum, 0], [self.lnum, self.cpos], self.line)
+            if self.stashed isnot 0
+              let [tok, self.stashed] = [self.stashed, tok]
+            endif
+            return tok
+          elseif column < self.indents[-1]
+            continue " jump to the code that handle dedent
           endif
-          let self.cpos += 1
-          let self.pos += 1
-        endwhile
-
-        " skip comments or blank lines
-        " TODO: detect this before counting indent, maybe faster?
-        if self.line[self.pos] =~ "[#\n]"
-          let start_ = self.pos
-          let self.pos = self.max " end this line, do not scan token
-          if self.line[start_] == '#'
-            let commnet_token = self.line[start_ : -2]
-            let self.stashed = s:TokenInfo(s:TokenValue.NL, "\n",
-                  \ [self.lnum, self.cmax - 1],
-                  \ [self.lnum, self.cmax], self.line)
-            return s:TokenInfo(s:TokenValue.COMMENT,
-                  \ commnet_token,
-                  \ [self.lnum, self.cpos],
-                  \ [self.lnum, self.cpos + strchars(commnet_token)],
-                  \ self.line)
-          else
-            return s:TokenInfo(s:TokenValue.NL, "\n",
-                  \ [self.lnum, self.cmax - 1],
-                  \ [self.lnum, self.cmax],
-                  \ self.line)
-          endif
-        endif
-
-        let self.cur_indent = column
-        if column > self.indents[-1]
-          call add(self.indents, column)
-          return s:TokenInfo(s:TokenValue.INDENT,
-                \ self.line[:self.pos - 1],
-                \ [self.lnum, 0], [self.lnum, self.cpos], self.line)
-        elseif column < self.indents[-1]
-          continue " jump to the code that handle dedent
         endif
       else          " continued statement
         let self.continued = 0
@@ -295,15 +282,19 @@ function! s:Tokenizer._tokenize()
 
       if initial =~ '[0-9]' ||
             \ (initial == '.' && token != '.' && token != '...')
-        return s:TokenInfo(s:TokenValue.NUMBER, token, spos, epos, self.line)
+        let tok = s:TokenInfo(s:TokenValue.NUMBER, token, spos, epos, self.line)
       elseif initial == "\n"
-        if self.parenlev > 0
-          return s:TokenInfo(s:TokenValue.NL, token, spos, epos, self.line)
+        if self.parenlev > 0 || self.blank
+          let self.blank = 0
+          let tok = s:TokenInfo(s:TokenValue.NL, token, spos, epos, self.line)
         else
-          return s:TokenInfo(s:TokenValue.NEWLINE, token, spos, epos, self.line)
+          let tok = s:TokenInfo(s:TokenValue.NEWLINE, token, spos, epos, self.line)
+          if self.async_def
+            let self.async_def_nl = 1
+          endif
         endif
       elseif initial == '#'
-        return s:TokenInfo(s:TokenValue.COMMENT, token, spos, epos, self.line)
+        let tok = s:TokenInfo(s:TokenValue.COMMENT, token, spos, epos, self.line)
       elseif has_key(s:triple_quoted, token)         " check for triple_quoted
         let endprog = s:endpats[token]
         let endmatch = matchlist(self.line, endprog, self.pos)
@@ -312,7 +303,7 @@ function! s:Tokenizer._tokenize()
           let self.pos += len(endmatch[0])
           let self.cpos += strchars(endmatch[0])
           let token = self.line[start_: self.pos-1]
-          return s:TokenInfo(s:TokenValue.STRING,
+          let tok = s:TokenInfo(s:TokenValue.STRING,
                 \ token, spos, [self.lnum, self.cpos], self.line)
         else " multiple lines
           let strstart = spos
@@ -335,20 +326,45 @@ function! s:Tokenizer._tokenize()
           let contline = [self.line]
           break
         else
-          return s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
+          let tok = s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
         endif
-      elseif initial =~ '[a-zA-Z_]'
-        return s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
+      elseif initial =~ '[a-zA-Z_]' " isidentifier()
+        if token ==# 'async' || token ==# 'await'
+          if self.async_def
+            let tok = s:TokenInfo(token == 'async' ?
+                  \ s:TokenValue.ASYNC : s:TokenValue.AWAIT,
+                  \ token, spos, epos, self.line)
+          endif
+        endif
+        let tok = s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
+        if token ==# 'async' && self.stashed is 0
+          let self.stashed = tok
+          continue
+        endif
+        if token ==# 'def'
+          if self.stashed isnot 0 &&
+                \ self.stashed[0] == s:TokenValue.NAME &&
+                \ self.stashed[1] ==# 'async'
+            let self.async_def = 1
+            let self.async_def_indent = self.cur_indent
+            let self.stashed[0] = s:TokenValue.ASYNC
+          endif
+        endif
       elseif initial == '\'
         let self.continued = 1
+        continue
       else
         if initial =~ '[(\[{]'
           let self.parenlev += 1
         elseif initial =~ '[)}\]]'
           let self.parenlev -= 1
         endif
-        return s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)
+        let tok = s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)
       endif
+      if self.stashed isnot 0
+        let [tok, self.stashed] = [self.stashed, tok]
+      endif
+      return tok
     endwhile
   endwhile
 endfunction
@@ -404,32 +420,44 @@ function! tokenize#ScanLine(line) abort
   endtry
 endfunction
 
-function! s:Tokenizer.GetNextToken() abort
-  if self.error_or_end
-    throw 'StopIteration'
-  endif
-  try
-    let val=self._tokenize()
-    return val
-  catch /^Vim(.*):E\d\+:/
-    call self.logger.error(v:exception)
-    echoerr 'VimError'
-  catch /^\w\+/
-    let self.error_or_end=1
-    throw v:exception
-  endtry
-endfunction
+let s:Tokenizer = {
+      \ 'blank': 0,
+      \ 'line': '',
+      \ 'async_def': 0,
+      \ 'async_def_indent': 0,
+      \ 'async_def_nl': 0,
+      \ 'async_stashed': 0,
+      \ 'contstr': 0,
+      \ 'needcont': 0,
+      \ 'continued': 0,
+      \ 'stashed': 0,
+      \ 'pos': 0,
+      \ 'cpos': 0,
+      \ 'cmax': 0,
+      \ 'max': 0,
+      \ 'cur_indent': 0,
+      \ 'error_or_end': 0,
+      \ 'bol': 1,
+      \ 'buffer_': 0,
+      \ 'buffer_size': 0,
+      \ 'lnum': 0,
+      \ 'parenlev': 0,
+      \ 'indents': [0],
+      \ 'GetNextToken': function('tokenize#GetNextToken'),
+      \ }
 
 function! tokenize#FromFile(path)
   let t_=deepcopy(s:Tokenizer)
   let b=readfile(a:path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
-  let t_.logger = tokenize#logging#get_logger(tempname())
+  let t_.logger = tokenize#logging#get_logger('./test/tokenize.log1')
+  " TODO: We can check self.lnum == 0 at the beginning of the
+  " tokenize loop to return the encoding token.
   let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
   let t_.logger.filename = s:__file__
-  " let t_.logger.log_to_stderr = 1
+  let t_.logger.log_to_stderr = 1
   return t_
 endfunction
 
@@ -451,10 +479,10 @@ function! tokenize#dump(str)
   " If has both, use single quote, escape single quotes, '\'"'.
   if a:str =~ '"' && a:str !~ "'"
     return printf("'%s'", substitute(a:str, "[\001-\037\\\\]",
-        \  '\=get(s:escapes, submatch(0))', 'g'))
+          \  '\=get(s:escapes, submatch(0))', 'g'))
   elseif a:str =~ "'" && a:str !~ '"'
     return printf('"%s"', substitute(a:str, "[\001-\037\\\\]",
-        \  '\=get(s:escapes, submatch(0))', 'g'))
+          \  '\=get(s:escapes, submatch(0))', 'g'))
   else
     return printf("'%s'", substitute(a:str, "[\001-\037\\\\']",
           \  '\=get(s:escapes, submatch(0))', 'g'))
@@ -468,15 +496,17 @@ function! tokenize#main(path, out, exact)
     while 1
       let tk = tknr.GetNextToken()
       let token_range = call('printf', ['%d,%d-%d,%d:']+tk[2]+tk[3])
-      if tk[0] == s:TokenValue.OP && a:exact
-        let tk[0] = s:ExactType[tk[1]]
+      let type = tk[0]
+      if type == s:TokenValue.OP && a:exact
+        let type = get(s:ExactType, tk[1], type)
       endif
       call add(val, printf('%-20s%-15s%-15S', token_range,
-            \ s:TokenName[tk[0]], tokenize#dump(tk[1])))
+            \ s:TokenName[type], tokenize#dump(tk[1])))
     endwhile
   catch 'StopIteration'
   catch
     call tknr.logger.error(v:exception)
+    call tknr.logger.error(v:throwpoint)
   finally
     call tknr.logger.flush()
   endtry

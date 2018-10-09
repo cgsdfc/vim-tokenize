@@ -182,3 +182,8 @@ Assert '"string"' =~ sd.ContStr
 Execute(PseudoExtras);
 Assert '' =~ sd.PseudoExtras
 Assert '\' =~ sd.PseudoExtras
+
+Execute(Blank);
+Assert '  ' =~ sd.Blank
+Assert ' # comment  ' =~ sd.Blank
+Assert ' name ' !~ sd.Blank
