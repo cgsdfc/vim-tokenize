@@ -6,3 +6,5 @@ __pycache__/
 *.diff
 out
 OUT
+test/database
+test/*.py
