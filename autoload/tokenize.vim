@@ -101,15 +101,6 @@ function! tokenize#scriptdict()
   return s:
 endfunction
 
-function! s:IndentationError(msg, args)
-  return a:msg
-endfunction
-
-function! s:TokenError(msg, args)
-  return a:msg
-endfunction
-
-" {{{1
 function! tokenize#GetNextToken() dict abort
   if self.error_or_end
     throw 'StopIteration'
@@ -119,10 +110,8 @@ function! tokenize#GetNextToken() dict abort
     " detect indent/dedent
     if self.cur_indent < self.indents[-1]
       if index(self.indents, self.cur_indent) < 0
-        let self.error_or_end = 1
-        throw s:IndentationError(
-              \ "unindent does not match any outer indentation level",
-              \ ["<tokenize>", self.lnum, self.cpos, self.line])
+        call self._on_error('IndentationError',
+              \ "unindent does not match any outer indentation level")
       endif
       unlet self.indents[-1]
       if self.async_def && self.async_def_indent >= self.indents[-1]
@@ -146,12 +135,10 @@ function! tokenize#GetNextToken() dict abort
 
     if self.lnum >= self.buffer_size && self.pos >= self.max
       if self.contstr
-        let self.error_or_end = 1
-        throw s:TokenError("EOF in multi-line string", strstart)
+        call self._on_error('TokenError', 'EOF in multi-line string')
       endif
       if self.continued
-        let self.error_or_end = 1
-        throw s:TokenError("EOF in mult-line statement", [self.lnum, 0])
+        call self._on_error('TokenError', 'EOF in mult-line statement')
       endif
       if self.stashed isnot 0
         let [tok, self.stashed] = [self.stashed, 0]
@@ -340,9 +327,9 @@ function! tokenize#GetNextToken() dict abort
     endwhile
   endwhile
 endfunction
-" }}}1
 
 let s:Tokenizer = {
+      \ 'filename',
       \ 'blank': 0,
       \ 'line': '',
       \ 'async_def': 0,
@@ -368,11 +355,19 @@ let s:Tokenizer = {
       \ 'GetNextToken': function('tokenize#GetNextToken'),
       \}
 
+function! s:Tokenizer._on_error(type, msg) abort
+  let self.error_or_end = 1
+  let msg = printf('%s: %s:%d:%d: %s',
+        \ a:type, self.filename, self.lnum, self.cpos, a:msg)
+  throw msg
+endfunction
+
 function! tokenize#FromFile(path)
   let t_=deepcopy(s:Tokenizer)
   let b=readfile(a:path)
   let t_.buffer_=map(b, 'v:val."\n"')
   let t_.buffer_size=len(b)
+  let t_.filename = a:path
   let t_.logger = tokenize#logging#get_logger('./test/tokenize.log1')
   let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
@@ -425,8 +420,10 @@ function! tokenize#main(path, out, exact)
     endwhile
   catch 'StopIteration'
   catch
-    call tknr.logger.error(v:exception)
-    call tknr.logger.error(v:throwpoint)
+    echohl ERROR
+    echo v:exception
+    echohl NONE
+    return
   finally
     call tknr.logger.flush()
   endtry
