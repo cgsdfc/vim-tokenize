@@ -329,7 +329,7 @@ function! tokenize#GetNextToken() dict abort
 endfunction
 
 let s:Tokenizer = {
-      \ 'filename',
+      \ 'filename': '',
       \ 'blank': 0,
       \ 'line': '',
       \ 'async_def': 0,

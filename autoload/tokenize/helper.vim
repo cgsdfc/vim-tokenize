@@ -1,63 +1,17 @@
+let s:__file__ = expand('<sfile>')
+
 python3 <<EOF
-import logging
-import tokenize
+import sys
 import vim
 import os
-
-def vim_tokenize(path):
-    'Tokenize a file using vim impl and convert the result to TokenInfo'
-    try:
-        return [tokenize.TokenInfo(int(tok[0]), tok[1],
-            tuple(map(int, tok[2])),
-            tuple(map(int, tok[3])), tok[4])
-            for tok in vim.eval('tokenize#helper#vim_tokenize(%r)' % path)]
-    except Exception as e:
-        print(e)
-
-def py_tokenize(path):
-    with open(path, 'rb') as f:
-        return list(tokenize.tokenize(f.__next__))
-
-def diff_tokenize(path):
-    '''Run 2 versions of tokenize() on path and return their diff in a list
-    '''
-    return vim_tokenize(path) == py_tokenize(path)
-
-def filenames_from_file(path):
-    '''Return a list of paths read from ``path``'''
-    with open(path) as f:
-        return list(f.readlines())
-
-def filenames_from_dir(dir_):
-    '''Return all the py files under a directory, recursively'''
-    for dirpath,_,filenames in os.walk(dir_):
-        for fn in filenames:
-            if fn.endswith('.py'):
-                yield os.path.join(dirpath, fn)
-
-def diff_batch(files, logger):
-    fails = 0
-    for i, path in enumerate(files, 1):
-        ok = diff_tokenize(path)
-        if not ok:
-            logger.error(path)
-        fails += not ok
-    logger.info('Run %d, Failed %d', i, fails)
-
-def test_tokenize(dir_):
-    '''Test tokenize() using all py files in dir_'''
-    logger = logging.getLogger('test_tokenize')
-    logger.setLevel(logging.DEBUG)
-    dest = os.path.abspath('./test/%s.log' % os.path.basename(dir_.strip(os.path.sep)))
-    fh = logging.FileHandler(dest, mode='w')
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    fh.setLevel(logging.DEBUG)
-    logger.addHandler(fh)
-    files = filenames_from_dir(dir_)
-    return diff_batch(files, logger)
-
+__file__ = vim.eval('s:__file__')
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from tools.test import test_tokenize
 EOF
+
+function! tokenize#helper#test_tokenize(dir_) abort
+  return py3eval('test_tokenize('.string(a:dir_).')')
+endfunction
 
 function! tokenize#helper#vim_tokenize(path) abort
   let tknr = tokenize#FromFile(a:path)
@@ -105,13 +59,14 @@ function! s:LineScanner.GetNextToken() abort
     let entire = psmat[0]
     let token = psmat[1]
     let self.pos += len(entire)
+    let self.cpos += strchars(entire)
     if empty(token)
       continue
     endif
     if token is "\n"
-      return [s:TokenValue.NL, "\n", [self.pos, self.pos+1]]
+      return [s:TokenValue.NL, "\n", [self.cpos, self.cpos+1]]
     endif
-    let loc_ = [self.pos-len(token), self.pos]
+    let loc_ = [self.cpos-len(token), self.cpos]
     return [s:TokenValue.OP, token, loc_]
   endwhile
 endfunction
