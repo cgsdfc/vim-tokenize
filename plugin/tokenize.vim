@@ -17,3 +17,4 @@ function! s:tokenize(...) range abort
 endfunction
 
 command! -bang -nargs=+ -range -complete=file Tokenize <line1>,<line2>call s:tokenize(<f-args>, <bang>0)
+command! -nargs=1 -complete=file TestTokenize py3 test_tokenize(<f-args>)

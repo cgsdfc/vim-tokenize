@@ -6,10 +6,13 @@ import os
 
 def vim_tokenize(path):
     'Tokenize a file using vim impl and convert the result to TokenInfo'
-    return [tokenize.TokenInfo(int(tok[0]), tok[1],
+    try:
+        return [tokenize.TokenInfo(int(tok[0]), tok[1],
             tuple(map(int, tok[2])),
-            tuple(map(int, tok[3])), tok[4]) 
+            tuple(map(int, tok[3])), tok[4])
             for tok in vim.eval('tokenize#helper#vim_tokenize(%r)' % path)]
+    except Exception as e:
+        print(e)
 
 def py_tokenize(path):
     with open(path, 'rb') as f:
@@ -36,16 +39,15 @@ def diff_batch(files, logger):
     fails = 0
     for i, path in enumerate(files, 1):
         ok = diff_tokenize(path)
-        if ok:
-            logger.info('%s: OK', path)
-        else:
-            logger.error('%s: Failure', path)
+        if not ok:
+            logger.error(path)
         fails += not ok
     logger.info('Run %d, Failed %d', i, fails)
 
 def test_tokenize(dir_):
     '''Test tokenize() using all py files in dir_'''
     logger = logging.getLogger('test_tokenize')
+    logger.setLevel(logging.DEBUG)
     dest = os.path.abspath('./test/%s.log' % os.path.basename(dir_.strip(os.path.sep)))
     fh = logging.FileHandler(dest, mode='w')
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

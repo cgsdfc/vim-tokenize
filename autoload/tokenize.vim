@@ -137,11 +137,12 @@ function! tokenize#GetNextToken() dict abort
       return tok
     endif
 
-    if self.async_def && self.async_def_nl && self.async_def_indent >= self.indents[-1]
-      let self.async_def = 0
-      let self.async_def_nl = 0
-      let self.async_def_indent = 0
-    endif
+    " if self.async_def && self.async_def_nl &&
+    "       \ self.async_def_indent >= self.indents[-1]
+    "   let self.async_def = 0
+    "   let self.async_def_nl = 0
+    "   let self.async_def_indent = 0
+    " endif
 
     if self.lnum >= self.buffer_size && self.pos >= self.max
       if self.contstr
@@ -192,7 +193,7 @@ function! tokenize#GetNextToken() dict abort
           call add(contstr, self.line)
           let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
-                \ [self.lnum, self.cmax)], join(contline, ''))
+                \ [self.lnum, self.cmax], join(contline, ''))
           let [tok, self.stashed] = [self.stashed, tok]
           return tok
         else
@@ -295,7 +296,7 @@ function! tokenize#GetNextToken() dict abort
       elseif (has_key(s:single_quoted, initial) ||
             \ has_key(s:single_quoted, token[:1]) ||
             \ has_key(s:single_quoted, token[:2]))
-        if self.line[end_ - 1] == '\'
+        if self.line[end_ - 1] == "\n"
           let strstart = spos
           let endprog = get(s:endpats, initial,
                 \ get(s:endpats, token[1],
