@@ -61,4 +61,4 @@ def test_tokenize(dir_):
     fh.setLevel(logging.DEBUG)
     logger.addHandler(fh)
     files = filenames_from_dir(dir_)
-    return diff_batch(files, logger)
+    return do_test(files, logger)

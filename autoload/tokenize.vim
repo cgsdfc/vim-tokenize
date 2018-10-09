@@ -107,6 +107,20 @@ function! tokenize#GetNextToken() dict abort
   endif
 
   while 1
+    if self.end_of_input
+      if self.stashed isnot 0
+        let [tok, self.stashed] = [self.stashed, 0]
+        return tok
+      endif
+      if len(self.indents) == 1
+        let self.error_or_end = 1
+        return s:TokenInfo(s:TokenValue.ENDMARKER, '', [self.lnum, 0], [self.lnum, 0], '')
+      else
+        unlet self.indents[-1]
+        return s:TokenInfo(s:TokenValue.DEDENT, '',  [self.lnum, 0], [self.lnum, 0], '')
+      endif
+    endif
+
     " detect indent/dedent
     if self.cur_indent < self.indents[-1]
       if index(self.indents, self.cur_indent) < 0
@@ -133,34 +147,16 @@ function! tokenize#GetNextToken() dict abort
     "   let self.async_def_indent = 0
     " endif
 
-    if self.lnum >= self.buffer_size && self.pos >= self.max
-      if self.contstr
-        call self._on_error('TokenError', 'EOF in multi-line string')
-      endif
-      if self.continued
-        call self._on_error('TokenError', 'EOF in mult-line statement')
-      endif
-      if self.stashed isnot 0
-        let [tok, self.stashed] = [self.stashed, 0]
-        return tok
-      endif
-      let last_line = self.buffer_size + 1
-      if len(self.indents) == 1
-        let self.error_or_end = 1
-        return s:TokenInfo(s:TokenValue.ENDMARKER, '', [last_line, 0], [last_line, 0], '')
-      else
-        unlet self.indents[-1]
-        return s:TokenInfo(s:TokenValue.DEDENT, '',  [last_line, 0], [last_line, 0], '')
-      endif
-    endif
-
     if self.contstr || self.pos >= self.max
-      let self.line=self.buffer_[self.lnum]
+      let self.line = self.getline()
       let self.lnum += 1
       let [self.pos, self.max] = [0, len(self.line)]
       let [self.cpos, self.cmax] = [0, strchars(self.line)]
 
       if self.contstr
+        if self.end_of_input
+          call self._on_error('TokenError', 'EOF in multi-line string')
+        endif
         let endmatch = matchlist(self.line, endprog)
         if !empty(endmatch)     " continued string ends
           let self.pos = len(endmatch[0])
@@ -189,6 +185,9 @@ function! tokenize#GetNextToken() dict abort
           continue
         endif
       elseif self.parenlev == 0 && !self.continued " new statement
+        if self.end_of_input
+          continue
+        endif
         if self.line =~ s:Blank
           let self.blank = 1
         else
@@ -219,6 +218,9 @@ function! tokenize#GetNextToken() dict abort
           endif
         endif
       else          " continued statement
+        if self.end_of_input
+          call self._on_error('TokenError', 'EOF in mult-line statement')
+        endif
         let self.continued = 0
       endif
     endif
@@ -329,6 +331,8 @@ function! tokenize#GetNextToken() dict abort
 endfunction
 
 let s:Tokenizer = {
+      \ 'getline': 0,
+      \ 'end_of_input': 0,
       \ 'filename': '',
       \ 'blank': 0,
       \ 'line': '',
@@ -362,6 +366,14 @@ function! s:Tokenizer._on_error(type, msg) abort
   throw msg
 endfunction
 
+function! tokenize#file_getline() dict
+  if self.lnum >= self.buffer_size
+    let self.end_of_input = 1
+    return ''
+  endif
+  return self.buffer_[self.lnum]
+endfunction
+
 function! tokenize#FromFile(path)
   let t_=deepcopy(s:Tokenizer)
   let b=readfile(a:path)
@@ -371,6 +383,7 @@ function! tokenize#FromFile(path)
   let t_.logger = tokenize#logging#get_logger('./test/tokenize.log1')
   let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
+  let t_.getline = function('tokenize#file_getline')
   let t_.logger.filename = s:__file__
   let t_.logger.log_to_stderr = 1
   return t_
