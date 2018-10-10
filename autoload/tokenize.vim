@@ -1,8 +1,8 @@
-let s:TAB_SIZE=8
-let s:TokenValue=tokenize#token#Value
-let s:TokenName=tokenize#token#Name
-let s:AllStringPrefixes=tokenize#token#AllStringPrefixes
-let s:ExactType=tokenize#token#ExactType
+let s:TAB_SIZE = 8
+let s:TokenValue = tokenize#token#Value
+let s:TokenName = tokenize#token#Name
+let s:AllStringPrefixes = tokenize#token#AllStringPrefixes
+let s:ExactType = tokenize#token#ExactType
 let s:__file__ = expand('<sfile>')
 
 function! s:regex(str) abort
@@ -29,8 +29,8 @@ function! s:TokenInfo(type, string, start_, end_, line)
   return [a:type, a:string, a:start_, a:end_, a:line]
 endfunction
 
-let s:cookie=s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+")
-let s:Blank=s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
+let s:cookie = s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+")
+let s:Blank = s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
 
 let s:Whitespace = s:regex("[ \f\t]*")
 let s:Comment = s:regex("#[^\r\n]*")
@@ -50,51 +50,51 @@ let s:Floatnumber = s:group(s:Pointfloat, s:Expfloat)
 let s:Imagnumber = s:group(s:regex('[0-9]\%(_\=[0-9]\)*[jJ]'),s:Floatnumber.'[jJ]')
 let s:Number = s:group(s:Imagnumber,s:Floatnumber,s:Intnumber)
 
-let s:Single=s:regex('[^''\\]*\%(\\.[^''\\]*\)*''')
-let s:Double=s:regex('[^"\\]*\%(\\.[^"\\]*\)*"')
-let s:Single3=s:regex('[^''\\]*\%(\%(\\.\|''\%(''''\)\@!\)[^''\\]*\)*''''''')
-let s:Double3=s:regex('[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""')
+let s:Single = s:regex('[^''\\]*\%(\\.[^''\\]*\)*''')
+let s:Double = s:regex('[^"\\]*\%(\\.[^"\\]*\)*"')
+let s:Single3 = s:regex('[^''\\]*\%(\%(\\.\|''\%(''''\)\@!\)[^''\\]*\)*''''''')
+let s:Double3 = s:regex('[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""')
 let s:StringPrefix = s:regex(s:lgroup(s:AllStringPrefixes))
-let s:Triple=s:group(s:StringPrefix."'''", s:StringPrefix.'"""')
+let s:Triple = s:group(s:StringPrefix."'''", s:StringPrefix.'"""')
 
-let s:Operator=s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
+let s:Operator = s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
             \ '//=\?', '->',
             \ '[+\-*/%&@|^=<>]=\=',
             \ '\~'))
 
-let s:Bracket=s:regex('[][(){}]')
-let s:Special=s:regex(s:group("\n", '\.\.\.', '[:;.,@]'))
-let s:Funny=s:group(s:Operator,s:Bracket,s:Special)
+let s:Bracket = s:regex('[][(){}]')
+let s:Special = s:regex(s:group("\n", '\.\.\.', '[:;.,@]'))
+let s:Funny = s:group(s:Operator,s:Bracket,s:Special)
 
 " First (or only) line of ' or " string.
-let s:ContStr=s:group(s:StringPrefix."'[^'\n\\\\]*\\%(\\\\.[^'\n\\\\]*\\)*"
+let s:ContStr = s:group(s:StringPrefix."'[^'\n\\\\]*\\%(\\\\.[^'\n\\\\]*\\)*"
             \ .s:group("'", "\\\\\n"),
             \ s:StringPrefix."\"[^\"\n\\\\]*\\%(\\\\.[^\"\n\\\\]*\\)*"
             \ .s:group('"', "\\\\\n"))
-let s:PseudoExtras=s:group("\\\\\n\\|\\%$", s:Comment, s:Triple)
+let s:PseudoExtras = s:group("\\\\\n\\|\\%$", s:Comment, s:Triple)
 let s:PseudoToken = '^'.s:Whitespace.s:cgroup(
       \ s:PseudoExtras,
       \ s:Number,
       \ s:Funny,
       \ s:ContStr,
       \ s:Name)
-let tokenize#PseudoToken=s:PseudoToken
+let tokenize#PseudoToken = s:PseudoToken
 
-let s:endpats={}
+let s:endpats = {}
 for s:prefix in s:AllStringPrefixes
-    let s:endpats[s:prefix."'"]=s:Single
-    let s:endpats[s:prefix.'"']=s:Double
-    let s:endpats[s:prefix."'''"]=s:Single3
-    let s:endpats[s:prefix.'"""']=s:Double3
+    let s:endpats[s:prefix."'"] = s:Single
+    let s:endpats[s:prefix.'"'] = s:Double
+    let s:endpats[s:prefix."'''"] = s:Single3
+    let s:endpats[s:prefix.'"""'] = s:Double3
 endfor
 
-let s:single_quoted={}
-let s:triple_quoted={}
+let s:single_quoted = {}
+let s:triple_quoted = {}
 for s:t in s:AllStringPrefixes
-  let s:single_quoted[s:t.'"']=1
-  let s:single_quoted[s:t."'"]=1
-  let s:triple_quoted[s:t.'"""']=1
-  let s:triple_quoted[s:t."'''"]=1
+  let s:single_quoted[s:t.'"'] = 1
+  let s:single_quoted[s:t."'"] = 1
+  let s:triple_quoted[s:t.'"""'] = 1
+  let s:triple_quoted[s:t."'''"] = 1
 endfor
 
 function! tokenize#scriptdict()
@@ -350,7 +350,6 @@ let s:Tokenizer = {
       \ 'max': 0,
       \ 'cur_indent': 0,
       \ 'error_or_end': 0,
-      \ 'bol': 1,
       \ 'buffer_': 0,
       \ 'buffer_size': 0,
       \ 'lnum': 0,
@@ -375,18 +374,15 @@ function! tokenize#file_getline() dict
 endfunction
 
 function! tokenize#FromFile(path)
-  let t_=deepcopy(s:Tokenizer)
-  let b=readfile(a:path)
-  let t_.buffer_=map(b, 'v:val."\n"')
-  let t_.buffer_size=len(b)
-  let t_.filename = a:path
-  let t_.logger = tokenize#logging#get_logger('./test/tokenize.log1')
-  let t_.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
+  let tknr = deepcopy(s:Tokenizer)
+  let b = readfile(a:path)
+  let tknr.buffer_ = map(b, 'v:val."\n"')
+  let tknr.buffer_size = len(b)
+  let tknr.filename = a:path
+  let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
         \ [0, 0], [0, 0], '')
-  let t_.getline = function('tokenize#file_getline')
-  let t_.logger.filename = s:__file__
-  let t_.logger.log_to_stderr = 1
-  return t_
+  let tknr.getline = function('tokenize#file_getline')
+  return tknr
 endfunction
 
 let s:escapes = {
@@ -442,9 +438,5 @@ function! tokenize#main(path, out, exact)
     echo v:exception
     echohl NONE
     return
-  finally
-    call tknr.logger.flush()
   endtry
 endfunction
-
-" vim:set fdm=markers
