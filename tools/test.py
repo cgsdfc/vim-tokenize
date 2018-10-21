@@ -96,5 +96,3 @@ def run_and_diff(path=None):
     vim.command(cmd)
     os.system('python3 -m tokenize -e %s >%s' % (path, pout))
     return (vout, pout)
-
-
