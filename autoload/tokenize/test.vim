@@ -1,28 +1,40 @@
-let s:__file__ = expand('<sfile>')
-
 python3 <<EOF
-import sys
-import vim
-import os
-__file__ = vim.eval('s:__file__')
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from tools.test import test_tokenize, run_and_diff
+import tokenize
+def _py_tokenize(path):
+    with open(path, 'rb') as f:
+        try:
+            return list(tokenize.tokenize(f.__next__))
+        except (IndentationError, tokenize.TokenError) as e:
+            return e.__class__.__name__
 EOF
 
-function! tokenize#test#test_tokenize(dir_) abort
-  return py3eval('test_tokenize()')
+" Return a list of tokens by tokenize.py or string of Exception name.
+function! tokenize#test#py_tokenize(path) abort
+  return py3eval(printf('_py_tokenize("%s")', a:path))
 endfunction
 
+" Return a list of tokens by tokenize.vim or string of Exception name
+" or error(<VimError>) when it crashed.
 function! tokenize#test#vim_tokenize(path) abort
   let tknr = tokenize#FromFile(a:path)
   let lst = []
   while 1
     try
       call add(lst, tknr.GetNextToken())
+    catch '^Vim'
+      return substitute(v:exception, 'Vim(\w\+): \(.*\)', 'error(\1)', 'g')
+    catch '^\(IndentationError\|TokenError\):'
+      return substitute(v:exception, '^\(IndentationError\|TokenError\):.*', '\1', 'g')
     catch 'StopIteration'
       return lst
     endtry
   endwhile
+endfunction
+
+" Test tokenize.vim against its python counterpart. Return true if their
+" outputs are the same.
+function! tokenize#test#against(path) abort
+  return tokenize#test#py_tokenize(a:path) == tokenize#test#vim_tokenize(a:path)
 endfunction
 
 function! tokenize#test#run_and_diff(path) abort
@@ -35,6 +47,7 @@ function! tokenize#test#run_and_diff(path) abort
     call delete(out)
   endfor
 endfunction
+
 function! tokenize#test#bytes_repr(bytes) abort
   let bytes = map(range(len(a:bytes)), 'char2nr(a:bytes[v:val])')
   return join(map(bytes, 'v:val < 256 ? nr2char(v:val) : printf(''\x%x'', v:val)'), '')
