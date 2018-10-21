@@ -18,4 +18,4 @@ endfunction
 
 command! -bang -nargs=+ -range -complete=file Tokenize <line1>,<line2>call s:tokenize(<f-args>, <bang>0)
 command! -nargs=1 -complete=file TokenizeTest call tokenize#test#test_tokenize(<f-args>)
-command! -nargs=1 -complete=file TokenizeDiff call tokenize#test#run_and_diff(<f-args>)
+command! -nargs=1 -complete=file TokenizeDiff call tokenize#test#capture_tokenize(<f-args>)

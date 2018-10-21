@@ -37,15 +37,23 @@ function! tokenize#test#against(path) abort
   return tokenize#test#py_tokenize(a:path) == tokenize#test#vim_tokenize(a:path)
 endfunction
 
-function! tokenize#test#run_and_diff(path) abort
-  let files = py3eval('run_and_diff()')
-  let [vout, pout] = files
-  execute 'tabnew' vout
-  execute 'diffsplit' pout
-  nnoremap q :tabclose
-  for out in files
-    call delete(out)
-  endfor
+function! s:stringify(lst)
+  return map(a:lst, 'tokenize#tuple_as_string(v:val)')
+endfunction
+
+function! s:setup_buffer(output)
+  call append(0, a:output)
+  setlocal buftype=nofile bufhidden=wipe nobuflisted nolist noswapfile nowrap cursorline modifiable nospell
+  diffthis
+endfunction
+
+function! tokenize#test#capture_tokenize(path) abort
+  tabnew
+  call s:setup_buffer(s:stringify(tokenize#test#py_tokenize(a:path)))
+  vnew
+  call s:setup_buffer(s:stringify(tokenize#test#vim_tokenize(a:path)))
+  execute 'f' 'TokenizeDiff'
+  nnoremap <buffer> q :tabclose<CR>
 endfunction
 
 function! tokenize#test#bytes_repr(bytes) abort

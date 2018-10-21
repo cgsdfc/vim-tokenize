@@ -332,7 +332,9 @@ function! tokenize#GetNextToken() dict abort
         elseif initial =~ '[)}\]]'
           let self.parenlev -= 1
         endif
-        let tok = s:TokenInfo(s:TokenValue.OP, token, spos, epos, self.line)
+        let type = self.exact && has_key(s:ExactType, token) ?
+              \ s:ExactType[token] : s:TokenValue.OP
+        let tok = s:TokenInfo(type, token, spos, epos, self.line)
       endif
       let [tok, self.stashed] = [self.stashed, tok]
       return tok
@@ -413,6 +415,7 @@ let s:Tokenizer = {
       \ 'parenlev': 0,
       \ 'indents': [0],
       \ 'encoding': '',
+      \ 'exact': 0,
       \ 'GetNextToken': function('tokenize#GetNextToken'),
       \ 'detect_encoding': function('s:detect_encoding'),
       \}
@@ -463,19 +466,30 @@ function! tokenize#dump(str)
   endif
 endfunction
 
+function! tokenize#tuple_as_dict(tuple) abort
+  return {
+        \ 'type': a:tuple[0],
+        \ 'string': a:tuple[1],
+        \ 'start': a:tuple[2],
+        \ 'end': a:tuple[3],
+        \ 'line': a:tuple[4]
+        \ }
+endfunction
+
+function! tokenize#tuple_as_string(tuple) abort
+  let token_range = call('printf', ['%d,%d-%d,%d:']+a:tuple[2]+a:tuple[3])
+  return printf('%-20s%-15s%-15S', token_range,
+        \ s:TokenName[a:tuple[0]], tokenize#dump(a:tuple[1]))
+endfunction
+
 function! tokenize#main(path, out, exact)
   try
     let tknr = tokenize#FromFile(a:path)
+    let tknr.exact = a:exact
     let val = []
     while 1
       let tk = tknr.GetNextToken()
-      let token_range = call('printf', ['%d,%d-%d,%d:']+tk[2]+tk[3])
-      let type = tk[0]
-      if type == s:TokenValue.OP && a:exact
-        let type = get(s:ExactType, tk[1], type)
-      endif
-      call add(val, printf('%-20s%-15s%-15S', token_range,
-            \ s:TokenName[type], tokenize#dump(tk[1])))
+      call add(val, tokenize#tuple_as_string(tk))
     endwhile
   catch 'StopIteration'
     if a:out ==# '<stdout>'
