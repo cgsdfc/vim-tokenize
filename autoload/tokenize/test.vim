@@ -9,11 +9,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from tools.test import test_tokenize, run_and_diff
 EOF
 
-function! tokenize#helper#test_tokenize(dir_) abort
+function! tokenize#test#test_tokenize(dir_) abort
   return py3eval('test_tokenize()')
 endfunction
 
-function! tokenize#helper#vim_tokenize(path) abort
+function! tokenize#test#vim_tokenize(path) abort
   let tknr = tokenize#FromFile(a:path)
   let lst = []
   while 1
@@ -25,7 +25,7 @@ function! tokenize#helper#vim_tokenize(path) abort
   endwhile
 endfunction
 
-function! tokenize#helper#run_and_diff(path) abort
+function! tokenize#test#run_and_diff(path) abort
   let files = py3eval('run_and_diff()')
   let [vout, pout] = files
   execute 'tabnew' vout
@@ -73,7 +73,7 @@ function! s:LineScanner.GetNextToken() abort
   endwhile
 endfunction
 
-function! tokenize#helper#ScanLine(line) abort
+function! tokenize#test#ScanLine(line) abort
   let lineScanner = deepcopy(s:LineScanner)
   let lineScanner.line = a:line
   let lineScanner.max = len(a:line)
@@ -91,20 +91,20 @@ function! tokenize#helper#ScanLine(line) abort
   endtry
 endfunction
 
-function! tokenize#helper#bytes_repr(bytes) abort
+function! tokenize#test#bytes_repr(bytes) abort
   let bytes = map(range(len(a:bytes)), 'char2nr(a:bytes[v:val])')
   return join(map(bytes, 'v:val < 256 ? nr2char(v:val) : printf(''\x%x'', v:val)'), '')
 endfunction
 
-function! tokenize#helper#encode(str, encoding) abort
+function! tokenize#test#encode(str, encoding) abort
   let bytes = iconv(a:str, 'UTF-8', a:encoding)
-  return tokenize#helper#bytes_repr(bytes)
+  return tokenize#test#bytes_repr(bytes)
 endfunction
 
-function! tokenize#helper#py_encode(string, enc) abort
+function! tokenize#test#py_encode(string, enc) abort
   return py3eval(printf("'%s'.encode('%s')", a:string, a:enc))
 endfunction
 
-function! tokenize#helper#py_decode(string, enc) abort
+function! tokenize#test#py_decode(string, enc) abort
   return py3eval(printf("b'%s'.decode('%s')", a:string, a:enc))
 endfunction
