@@ -427,6 +427,7 @@ function! s:Tokenizer._on_error(type, msg) abort
   throw msg
 endfunction
 
+" Create a Tokenizer from path.
 function! tokenize#FromFile(path)
   let tknr = deepcopy(s:Tokenizer)
   let tknr.buffer_ = readfile(a:path)
@@ -450,6 +451,7 @@ let s:escapes = {
       \ '"': '\"',
       \}
 
+" Turn a string into repr(string).
 function! tokenize#dump(str)
   " If only has single, use double quote, "'".
   " If only has double, use single quote, '"'.
@@ -466,6 +468,7 @@ function! tokenize#dump(str)
   endif
 endfunction
 
+" Turn token tuple into a dictionary.
 function! tokenize#tuple_as_dict(tuple) abort
   return {
         \ 'type': a:tuple[0],
@@ -476,26 +479,35 @@ function! tokenize#tuple_as_dict(tuple) abort
         \ }
 endfunction
 
+" Turn token tuple into a string.
 function! tokenize#tuple_as_string(tuple) abort
   let token_range = call('printf', ['%d,%d-%d,%d:']+a:tuple[2]+a:tuple[3])
   return printf('%-20s%-15s%-15S', token_range,
         \ s:TokenName[a:tuple[0]], tokenize#dump(a:tuple[1]))
 endfunction
 
-function! tokenize#main(path, out, exact)
+" Tokenize a file with results in a list. Exceptions other than StopIteration
+" are throw through.
+function! tokenize#list(path, exact) abort
+  let tknr = tokenize#FromFile(a:path)
+  let tknr.exact = a:exact
+  let lst = []
+  while 1
+    try
+      call add(lst, tknr.GetNextToken())
+    catch 'StopIteration'
+      return lst
+    endtry
+  endwhile
+endfunction
+
+" Tokenize a file, turn the tokens into strings and either writefile() or
+" echo.
+function! tokenize#main(path, out, exact) abort
   try
-    let tknr = tokenize#FromFile(a:path)
-    let tknr.exact = a:exact
-    let val = []
-    while 1
-      let tk = tknr.GetNextToken()
-      call add(val, tokenize#tuple_as_string(tk))
-    endwhile
-  catch 'StopIteration'
+    let val = map(tokenize#list(a:path, a:exact), 'tokenize#tuple_as_string(v:val)')
     if a:out ==# '<stdout>'
       echo join(val, "\n")
-    elseif a:out ==# '<string>'
-      return join(val, "\n")
     else
       call writefile(val, a:out)
     endif
@@ -506,4 +518,3 @@ function! tokenize#main(path, out, exact)
     return
   endtry
 endfunction
-
