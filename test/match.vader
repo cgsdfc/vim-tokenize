@@ -41,3 +41,9 @@ Log matchlist(' "string\  ', PseudoToken)
 Log matchlist(' `  ', PseudoToken)
 Log matchlist(' ?  ', PseudoToken)
 Log matchlist(' $  ', PseudoToken)
+
+Execute(cookie);
+let cookie = tokenize#scriptdict().cookie
+Log matchlist('# coding=utf-8', cookie)
+Log matchlist('# coding=latin-1', cookie)
+Log matchlist('# coding=gbk', cookie)

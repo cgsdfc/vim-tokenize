@@ -90,3 +90,21 @@ function! tokenize#helper#ScanLine(line) abort
     return out
   endtry
 endfunction
+
+function! tokenize#helper#bytes_repr(bytes) abort
+  let bytes = map(range(len(a:bytes)), 'char2nr(a:bytes[v:val])')
+  return join(map(bytes, 'v:val < 256 ? nr2char(v:val) : printf(''\x%x'', v:val)'), '')
+endfunction
+
+function! tokenize#helper#encode(str, encoding) abort
+  let bytes = iconv(a:str, 'UTF-8', a:encoding)
+  return tokenize#helper#bytes_repr(bytes)
+endfunction
+
+function! tokenize#helper#py_encode(string, enc) abort
+  return py3eval(printf("'%s'.encode('%s')", a:string, a:enc))
+endfunction
+
+function! tokenize#helper#py_decode(string, enc) abort
+  return py3eval(printf("b'%s'.decode('%s')", a:string, a:enc))
+endfunction

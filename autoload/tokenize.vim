@@ -1,3 +1,4 @@
+let s:LookupTable = tokenize#lookup#Table
 let s:TAB_SIZE = 8
 let s:TokenValue = tokenize#token#Value
 let s:TokenName = tokenize#token#Name
@@ -29,7 +30,7 @@ function! s:TokenInfo(type, string, start_, end_, line)
   return [a:type, a:string, a:start_, a:end_, a:line]
 endfunction
 
-let s:cookie = s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\)\\+")
+let s:cookie = s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\+\\)")
 let s:Blank = s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
 
 let s:Whitespace = s:regex("[ \f\t]*")
@@ -101,6 +102,10 @@ function! tokenize#scriptdict()
   return s:
 endfunction
 
+function! s:decode(str, encoding) abort
+  return iconv(a:str, a:encoding, 'UTF-8') . "\n"
+endfunction
+
 function! tokenize#GetNextToken() dict abort
   if self.error_or_end
     throw 'StopIteration'
@@ -148,7 +153,12 @@ function! tokenize#GetNextToken() dict abort
     " endif
 
     if self.contstr || self.pos >= self.max
-      let self.line = self.getline()
+      if self.lnum >= self.buffer_size
+        let self.end_of_input = 1
+        let self.line = ''
+      else
+        let self.line = s:decode(self.buffer_[self.lnum], self.encoding)
+      endif
       let self.lnum += 1
       let [self.pos, self.max] = [0, len(self.line)]
       let [self.cpos, self.cmax] = [0, strchars(self.line)]
@@ -330,6 +340,53 @@ function! tokenize#GetNextToken() dict abort
   endwhile
 endfunction
 
+function! s:detect_encoding() dict abort
+  let default = 'utf-8'
+  if self.buffer_size == 0 " empty file
+    return default
+  endif
+  let first_ = self.buffer_[0]
+  let encoding = s:find_cookie(first_, self.filename)
+  if encoding isnot 0
+    return encoding
+  endif
+  if first_ !~ s:Blank
+    return default
+  endif
+  if self.buffer_size < 2
+    return default
+  endif
+  let second = self.buffer_[1]
+  let encoding = s:find_cookie(second, self.filename)
+  if encoding isnot 0
+    return encoding
+  endif
+  return default
+endfunction
+
+function! s:find_cookie(line, filename) abort
+  let match = matchlist(a:line, s:cookie)
+  if empty(match)
+    return 0
+  endif
+  let encoding = s:get_normal_name(match[1])
+  if has_key(s:LookupTable, encoding)
+    return s:LookupTable[encoding]
+  endif
+  throw printf('SyntaxError: unknown encoding for "%s": %s', a:filename, encoding)
+endfunction
+
+function! s:get_normal_name(orig_enc)
+  let enc = substitute(tolower(a:orig_enc[:11]), '_', '-', 'g')
+  if enc =~# '^utf-8\(-.*\|$\)'
+    return 'utf-8'
+  endif
+  if enc =~# '^\(latin-1\|iso-8859-1\|iso-latin-1\)\(-.*\|$\)'
+    return 'iso-8859-1'
+  endif
+  return a:orig_enc
+endfunction
+
 let s:Tokenizer = {
       \ 'getline': 0,
       \ 'end_of_input': 0,
@@ -355,7 +412,9 @@ let s:Tokenizer = {
       \ 'lnum': 0,
       \ 'parenlev': 0,
       \ 'indents': [0],
+      \ 'encoding': '',
       \ 'GetNextToken': function('tokenize#GetNextToken'),
+      \ 'detect_encoding': function('s:detect_encoding'),
       \}
 
 function! s:Tokenizer._on_error(type, msg) abort
@@ -365,23 +424,14 @@ function! s:Tokenizer._on_error(type, msg) abort
   throw msg
 endfunction
 
-function! tokenize#file_getline() dict
-  if self.lnum >= self.buffer_size
-    let self.end_of_input = 1
-    return ''
-  endif
-  return self.buffer_[self.lnum]
-endfunction
-
 function! tokenize#FromFile(path)
   let tknr = deepcopy(s:Tokenizer)
-  let b = readfile(a:path)
-  let tknr.buffer_ = map(b, 'v:val."\n"')
-  let tknr.buffer_size = len(b)
+  let tknr.buffer_ = readfile(a:path)
+  let tknr.buffer_size = len(tknr.buffer_)
   let tknr.filename = a:path
-  let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING, 'utf-8',
-        \ [0, 0], [0, 0], '')
-  let tknr.getline = function('tokenize#file_getline')
+  let encoding = tknr.detect_encoding()
+  let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING,
+        \ encoding, [0, 0], [0, 0], '')
   return tknr
 endfunction
 
@@ -414,9 +464,9 @@ function! tokenize#dump(str)
 endfunction
 
 function! tokenize#main(path, out, exact)
-  let tknr = tokenize#FromFile(a:path)
-  let val = []
   try
+    let tknr = tokenize#FromFile(a:path)
+    let val = []
     while 1
       let tk = tknr.GetNextToken()
       let token_range = call('printf', ['%d,%d-%d,%d:']+tk[2]+tk[3])
@@ -430,6 +480,8 @@ function! tokenize#main(path, out, exact)
   catch 'StopIteration'
     if a:out ==# '<stdout>'
       echo join(val, "\n")
+    elseif a:out ==# '<string>'
+      return join(val, "\n")
     else
       call writefile(val, a:out)
     endif
@@ -440,3 +492,4 @@ function! tokenize#main(path, out, exact)
     return
   endtry
 endfunction
+
