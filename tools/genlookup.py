@@ -1,15 +1,16 @@
 '''
-Generate ``tokenize#lookup#Table`` which maps codecs name (Python) to iconv() name (Vim).
-Those names can be recognized by both sides.
+Generate ``tokenize#lookup#Table`` which maps normalized codecs name to
+names recognized by iconv().
 '''
 
+import re
 import sys
 import subprocess
 import os
 import codecs
 from pprint import pprint as pp
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 def call_iconv_list():
     '''
@@ -18,15 +19,20 @@ def call_iconv_list():
     res = subprocess.check_output(['iconv', '--list'])
     return [s.strip('/') for s in res.decode().split()]
 
+
 def get_lookup_mapping(il):
     '''
-    Return a lookup mapping m where ``m[codecs_name]=iconv_name``
+    Return a lookup mapping m where acceptable names are mapped to iconv_name
     '''
+    def normalize(name):
+        name=re.sub(r'([A-Za-z]+)([0-9]+)', r'\1-\2', name)
+        return re.sub('_', '-', name).lower()
+
     def iter_names(il):
         for name in il:
             try:
                 codecs_name = codecs.lookup(name).name
-                yield (codecs_name, name)
+                yield (normalize(codecs_name), name)
             except LookupError:
                 continue
     return dict(iter_names(il))
@@ -35,7 +41,8 @@ def proccess_mapping(m):
     '''
     Process the mapping so that it is suitable for dump_vim_dict()
     '''
-    return sorted(list(m.items()))
+
+    return sorted(m.items())
 
 def dump_vim_dict(ilist, out):
     '''
@@ -49,19 +56,17 @@ def dump_vim_dict(ilist, out):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Generate lookup table from iconv --list')
-    parser.add_argument('--output', default=sys.stdout,
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-o', '--output', dest='output',
+            default=sys.stdout,
             type=argparse.FileType('w'), help='output file path')
     args = parser.parse_args()
     il = call_iconv_list()
-    if il is None:
-        return 1
     mapping = get_lookup_mapping(il)
     il = proccess_mapping(mapping)
     with args.output as out:
         return dump_vim_dict(il, out)
-    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

@@ -381,6 +381,8 @@ function! s:find_cookie(line, filename) abort
   throw printf('SyntaxError: unknown encoding for "%s": %s', a:filename, encoding)
 endfunction
 
+" Normalize orig_enc. All characters are lower case and _'s are replaced with
+" -
 function! s:get_normal_name(orig_enc)
   let enc = substitute(tolower(a:orig_enc[:11]), '_', '-', 'g')
   if enc =~# '^utf-8\(-.*\|$\)'
