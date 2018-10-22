@@ -110,18 +110,68 @@ function! s:decode(str, encoding) abort
   return iconv(a:str, a:encoding, 'UTF-8') . "\n"
 endfunction
 
+" The Tokenizer structure:
+" end_of_input: input ends, no more bytes left to tokenize.
+" filename: (maybe not absolute) path to the file being tokenized.
+" blank: flag used to tell NL from NEWLINE in a blank (comment Whitespace only) line.
+" line: current line.
+" async_def: flag set when inside an `async def` block.
+" async_def_indent: indent of the line that enters async def block, used to tell
+" the leaving from an async def block.
+" async_def_nl: currently unspecified.
+" contstr: flag set when in a multi-line string (triple quoted or backslash
+" newline).
+" needcont: TODO
+" continued: TODO
+" stashed: One pending token.
+" pos: current byte position in line.
+" cpos: current character position in line.
+" cmax: maximum character position in line.
+" max: maximum byte position in line.
+" cur_indent: current indent level used to track dedent popping.
+" error_or_end: flag set when token stream ends or errored.
+" buffer_: a list of lines.
+" buffer_size: the size of buffer_.
+" lnum: current line number.
+" parenlev: current parenthesis level.
+" indents: indent level stack.
+" _encoding: iconv() specific encoding name.
+" exact: flag set when exact type of OP should be used.
+let s:Tokenizer = {
+      \ 'end_of_input': 0,
+      \ 'filename': '',
+      \ 'blank': 0,
+      \ 'line': '',
+      \ 'async_def': 0,
+      \ 'async_def_indent': 0,
+      \ 'async_def_nl': 0,
+      \ 'contstr': 0,
+      \ 'needcont': 0,
+      \ 'continued': 0,
+      \ 'stashed': 0,
+      \ 'pos': 0,
+      \ 'max': 0,
+      \ 'cpos': 0,
+      \ 'cmax': 0,
+      \ 'cur_indent': 0,
+      \ 'error_or_end': 0,
+      \ 'buffer_': 0,
+      \ 'buffer_size': 0,
+      \ 'lnum': 0,
+      \ 'parenlev': 0,
+      \ 'indents': [0],
+      \ '_encoding': '',
+      \ 'exact': 0,
+      \}
+
 " The main tokenizer function.
-function! tokenize#GetNextToken() dict abort
+function! s:Tokenizer._tokenize() abort
   if self.error_or_end
     throw 'StopIteration'
   endif
 
   while 1
     if self.end_of_input
-      if self.stashed isnot 0
-        let [tok, self.stashed] = [self.stashed, 0]
-        return tok
-      endif
       if len(self.indents) == 1
         let self.error_or_end = 1
         return s:TokenInfo(s:TokenValue.ENDMARKER, '', [self.lnum, 0], [self.lnum, 0], '')
@@ -143,11 +193,9 @@ function! tokenize#GetNextToken() dict abort
         let self.async_def_nl = 0
         let self.async_def_indent = 0
       endif
-      let tok = s:TokenInfo(s:TokenValue.DEDENT, '',
+      return s:TokenInfo(s:TokenValue.DEDENT, '',
             \ [self.lnum, self.cpos],
             \ [self.lnum, self.cpos], self.line)
-      let [tok, self.stashed] = [self.stashed, tok]
-      return tok
     endif
 
     " if self.async_def && self.async_def_nl &&
@@ -181,19 +229,15 @@ function! tokenize#GetNextToken() dict abort
           call add(contline, self.line)
           let self.contstr = 0
           let self.needcont = 0
-          let tok = s:TokenInfo(s:TokenValue.STRING,
+          return s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cpos], join(contline, ''))
-          let [tok, self.stashed] = [self.stashed, tok]
-          return tok
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
           let self.contstr = 0
           call add(contstr, self.line)
-          let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN,
+          return s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cmax], join(contline, ''))
-          let [tok, self.stashed] = [self.stashed, tok]
-          return tok
         else
           call add(contstr, self.line)
           call add(contline, self.line)
@@ -223,11 +267,9 @@ function! tokenize#GetNextToken() dict abort
           let self.cur_indent = column
           if column > self.indents[-1]
             call add(self.indents, column)
-            let tok = s:TokenInfo(s:TokenValue.INDENT,
+            return s:TokenInfo(s:TokenValue.INDENT,
                   \ self.line[:self.pos - 1],
                   \ [self.lnum, 0], [self.lnum, self.cpos], self.line)
-            let [tok, self.stashed] = [self.stashed, tok]
-            return tok
           elseif column < self.indents[-1]
             continue " jump to the code that handle dedent
           endif
@@ -248,7 +290,6 @@ function! tokenize#GetNextToken() dict abort
               \ [self.lnum, self.cpos + 1], self.line)
         let self.pos += 1
         let self.cpos += 1
-        let [tok, self.stashed] = [self.stashed, tok]
         return tok
       endif
 
@@ -267,19 +308,18 @@ function! tokenize#GetNextToken() dict abort
 
       if initial =~ '[0-9]' ||
             \ (initial == '.' && token != '.' && token != '...')
-        let tok = s:TokenInfo(s:TokenValue.NUMBER, token, spos, epos, self.line)
+        return s:TokenInfo(s:TokenValue.NUMBER, token, spos, epos, self.line)
       elseif initial == "\n"
         if self.parenlev > 0 || self.blank
           let self.blank = 0
-          let tok = s:TokenInfo(s:TokenValue.NL, token, spos, epos, self.line)
-        else
-          let tok = s:TokenInfo(s:TokenValue.NEWLINE, token, spos, epos, self.line)
-          if self.async_def
-            let self.async_def_nl = 1
-          endif
+          return s:TokenInfo(s:TokenValue.NL, token, spos, epos, self.line)
+        endif " NEWLINE
+        if self.async_def
+          let self.async_def_nl = 1
         endif
+        return s:TokenInfo(s:TokenValue.NEWLINE, token, spos, epos, self.line)
       elseif initial == '#'
-        let tok = s:TokenInfo(s:TokenValue.COMMENT, token, spos, epos, self.line)
+        return s:TokenInfo(s:TokenValue.COMMENT, token, spos, epos, self.line)
       elseif has_key(s:triple_quoted, token)         " check for triple_quoted
         let endprog = s:endpats[token]
         let endmatch = matchlist(self.line, endprog, self.pos)
@@ -288,7 +328,7 @@ function! tokenize#GetNextToken() dict abort
           let self.pos += len(endmatch[0])
           let self.cpos += strchars(endmatch[0])
           let token = self.line[start_: self.pos-1]
-          let tok = s:TokenInfo(s:TokenValue.STRING,
+          return s:TokenInfo(s:TokenValue.STRING,
                 \ token, spos, [self.lnum, self.cpos], self.line)
         else " multiple lines
           let strstart = spos
@@ -311,23 +351,22 @@ function! tokenize#GetNextToken() dict abort
           let contline = [self.line]
           break
         else
-          let tok = s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
+          return s:TokenInfo(s:TokenValue.STRING, token, spos, epos, self.line)
         endif
       elseif initial =~ '[a-zA-Z_]' " isidentifier()
         if token =~# '\m\c^\(async\|await\)$' && self.async_def
-          let tok = s:TokenInfo(token == 'async' ?
+          return s:TokenInfo(token == 'async' ?
                 \ s:TokenValue.ASYNC : s:TokenValue.AWAIT,
                 \ token, spos, epos, self.line)
-        else
-          let tok = s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
-          if token ==# 'def' &&
-                \ self.stashed[0] == s:TokenValue.NAME &&
-                \ self.stashed[1] ==# 'async'
-            let self.async_def = 1
-            let self.async_def_indent = self.cur_indent
-            let self.stashed[0] = s:TokenValue.ASYNC
-          endif
         endif
+        if token ==# 'def' &&
+              \ self.stashed[0] == s:TokenValue.NAME &&
+              \ self.stashed[1] ==# 'async'
+          let self.async_def = 1
+          let self.async_def_indent = self.cur_indent
+          let self.stashed[0] = s:TokenValue.ASYNC
+        endif
+        return s:TokenInfo(s:TokenValue.NAME, token, spos, epos, self.line)
       elseif initial == '\'
         let self.continued = 1
         continue
@@ -339,12 +378,20 @@ function! tokenize#GetNextToken() dict abort
         endif
         let type = self.exact && has_key(s:ExactType, token) ?
               \ s:ExactType[token] : s:TokenValue.OP
-        let tok = s:TokenInfo(type, token, spos, epos, self.line)
+        return s:TokenInfo(type, token, spos, epos, self.line)
       endif
-      let [tok, self.stashed] = [self.stashed, tok]
-      return tok
     endwhile
   endwhile
+endfunction
+
+function! s:Tokenizer.GetNextToken() abort
+  if self.error_or_end && self.stashed isnot 0
+    let [tok, self.stashed] = [self.stashed, 0]
+    return tok
+  endif
+  let tok = self._tokenize()
+  let [tok, self.stashed] = [self.stashed, tok]
+  return tok
 endfunction
 
 " Detect encoding from the buffer.
@@ -398,61 +445,6 @@ function! s:get_normal_name(orig_enc)
   endif
   return a:orig_enc
 endfunction
-
-" Tokenizer structure:
-" end_of_input: input ends, no more bytes left to tokenize.
-" filename: (maybe not absolute) path to the file being tokenized.
-" blank: flag used to tell NL from NEWLINE in a blank (comment Whitespace only) line.
-" line: current line.
-" async_def: flag set when inside an `async def` block.
-" async_def_indent: indent of the line that enters async def block, used to tell
-" the leaving from an async def block.
-" async_def_nl: currently unspecified.
-" contstr: flag set when in a multi-line string (triple quoted or backslash
-" newline).
-" needcont: TODO
-" continued: TODO
-" stashed: One pending token.
-" pos: current byte position in line.
-" cpos: current character position in line.
-" cmax: maximum character position in line.
-" max: maximum byte position in line.
-" cur_indent: current indent level used to track dedent popping.
-" error_or_end: flag set when token stream ends or errored.
-" buffer_: a list of lines.
-" buffer_size: the size of buffer_.
-" lnum: current line number.
-" parenlev: current parenthesis level.
-" indents: indent level stack.
-" _encoding: iconv() specific encoding name.
-" exact: flag set when exact type of OP should be used.
-let s:Tokenizer = {
-      \ 'end_of_input': 0,
-      \ 'filename': '',
-      \ 'blank': 0,
-      \ 'line': '',
-      \ 'async_def': 0,
-      \ 'async_def_indent': 0,
-      \ 'async_def_nl': 0,
-      \ 'contstr': 0,
-      \ 'needcont': 0,
-      \ 'continued': 0,
-      \ 'stashed': 0,
-      \ 'pos': 0,
-      \ 'cpos': 0,
-      \ 'cmax': 0,
-      \ 'max': 0,
-      \ 'cur_indent': 0,
-      \ 'error_or_end': 0,
-      \ 'buffer_': 0,
-      \ 'buffer_size': 0,
-      \ 'lnum': 0,
-      \ 'parenlev': 0,
-      \ 'indents': [0],
-      \ '_encoding': '',
-      \ 'exact': 0,
-      \ 'GetNextToken': function('tokenize#GetNextToken'),
-      \}
 
 " Handle errors during tokenization.
 function! s:Tokenizer._on_error(type, msg) abort
