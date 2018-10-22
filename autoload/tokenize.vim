@@ -81,6 +81,8 @@ let s:PseudoToken = '^'.s:Whitespace.s:cgroup(
       \ s:Name)
 let tokenize#PseudoToken = s:PseudoToken
 
+" Map all variations of beginning of a string to patterns
+" of its ending part.
 let s:endpats = {}
 for s:prefix in s:AllStringPrefixes
     let s:endpats[s:prefix."'"] = s:Single
@@ -89,6 +91,7 @@ for s:prefix in s:AllStringPrefixes
     let s:endpats[s:prefix.'"""'] = s:Double3
 endfor
 
+" Keep all variations of single quotes and triple quotes.
 let s:single_quoted = {}
 let s:triple_quoted = {}
 for s:t in s:AllStringPrefixes
@@ -102,10 +105,12 @@ function! tokenize#scriptdict()
   return s:
 endfunction
 
+" Convert str from encoding to utf-8 adding tailing newline.
 function! s:decode(str, encoding) abort
   return iconv(a:str, a:encoding, 'UTF-8') . "\n"
 endfunction
 
+" The main tokenizer function.
 function! tokenize#GetNextToken() dict abort
   if self.error_or_end
     throw 'StopIteration'
@@ -384,7 +389,7 @@ endfunction
 " Normalize orig_enc. All characters are lower case and _'s are replaced with
 " -
 function! s:get_normal_name(orig_enc)
-  let enc = substitute(tolower(a:orig_enc[:11]), '_', '-', 'g')
+  let enc = substitute(tolower(a:orig_enc[:11]), '[-_]', '', 'g')
   if enc =~# '^utf-8\(-.*\|$\)'
     return 'utf-8'
   endif
@@ -394,8 +399,34 @@ function! s:get_normal_name(orig_enc)
   return a:orig_enc
 endfunction
 
+" Tokenizer structure:
+" end_of_input: input ends, no more bytes left to tokenize.
+" filename: (maybe not absolute) path to the file being tokenized.
+" blank: flag used to tell NL from NEWLINE in a blank (comment Whitespace only) line.
+" line: current line.
+" async_def: flag set when inside an `async def` block.
+" async_def_indent: indent of the line that enters async def block, used to tell
+" the leaving from an async def block.
+" async_def_nl: currently unspecified.
+" contstr: flag set when in a multi-line string (triple quoted or backslash
+" newline).
+" needcont: TODO
+" continued: TODO
+" stashed: One pending token.
+" pos: current byte position in line.
+" cpos: current character position in line.
+" cmax: maximum character position in line.
+" max: maximum byte position in line.
+" cur_indent: current indent level used to track dedent popping.
+" error_or_end: flag set when token stream ends or errored.
+" buffer_: a list of lines.
+" buffer_size: the size of buffer_.
+" lnum: current line number.
+" parenlev: current parenthesis level.
+" indents: indent level stack.
+" _encoding: iconv() specific encoding name.
+" exact: flag set when exact type of OP should be used.
 let s:Tokenizer = {
-      \ 'getline': 0,
       \ 'end_of_input': 0,
       \ 'filename': '',
       \ 'blank': 0,
@@ -403,7 +434,6 @@ let s:Tokenizer = {
       \ 'async_def': 0,
       \ 'async_def_indent': 0,
       \ 'async_def_nl': 0,
-      \ 'async_stashed': 0,
       \ 'contstr': 0,
       \ 'needcont': 0,
       \ 'continued': 0,
@@ -424,6 +454,7 @@ let s:Tokenizer = {
       \ 'GetNextToken': function('tokenize#GetNextToken'),
       \}
 
+" Handle errors during tokenization.
 function! s:Tokenizer._on_error(type, msg) abort
   let self.error_or_end = 1
   let msg = printf('%s: %s:%d:%d: %s',
@@ -443,6 +474,7 @@ function! tokenize#FromFile(path)
   return tknr
 endfunction
 
+" Escapes table from scriptease.vim
 let s:escapes = {
       \ "\b": '\b',
       \ "\e": '\e',
