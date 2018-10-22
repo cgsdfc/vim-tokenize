@@ -396,7 +396,7 @@ endfunction
 
 " Detect encoding from the buffer.
 function! s:detect_encoding(buffer_, buffer_size, filename) abort
-  let default = 'utf-8'
+  let default = 'utf8'
   if a:buffer_size == 0 " empty file
     return default
   endif
@@ -437,11 +437,11 @@ endfunction
 " -
 function! s:get_normal_name(orig_enc)
   let enc = substitute(tolower(a:orig_enc[:11]), '[-_]', '', 'g')
-  if enc =~# '^utf-8\(-.*\|$\)'
-    return 'utf-8'
+  if enc =~# '^utf8'
+    return 'utf8'
   endif
-  if enc =~# '^\(latin-1\|iso-8859-1\|iso-latin-1\)\(-.*\|$\)'
-    return 'iso-8859-1'
+  if enc =~# '^\(latin1\|iso88591\|isolatin1\)'
+    return 'iso88591'
   endif
   return a:orig_enc
 endfunction

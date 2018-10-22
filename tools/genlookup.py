@@ -25,8 +25,7 @@ def get_lookup_mapping(il):
     Return a lookup mapping m where acceptable names are mapped to iconv_name
     '''
     def normalize(name):
-        name=re.sub(r'([A-Za-z]+)([0-9]+)', r'\1-\2', name)
-        return re.sub('_', '-', name).lower()
+        return re.sub('[-_]', '', name).lower()
 
     def iter_names(il):
         for name in il:
