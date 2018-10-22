@@ -47,3 +47,4 @@ let cookie = tokenize#scriptdict().cookie
 Log matchlist('# coding=utf-8', cookie)
 Log matchlist('# coding=latin-1', cookie)
 Log matchlist('# coding=gbk', cookie)
+Log matchlist('# -*- Mode: Python; coding: utf-8; indent-tabs-mode: nil; tab-width: 4 -*-', cookie)
