@@ -4,7 +4,7 @@ def _py_tokenize(path):
     with open(path, 'rb') as f:
         try:
             return list(tokenize.tokenize(f.__next__))
-        except (IndentationError, tokenize.TokenError) as e:
+        except (IndentationError, tokenize.TokenError, SyntaxError) as e:
             return e.__class__.__name__
 EOF
 
@@ -21,8 +21,8 @@ function! tokenize#test#vim_tokenize(path) abort
     return lst
   catch '^Vim'
     return substitute(v:exception, 'Vim(\w\+): \(.*\)', 'error(\1)', 'g')
-  catch '^\(IndentationError\|TokenError\):'
-    return substitute(v:exception, '^\(IndentationError\|TokenError\):.*', '\1', 'g')
+  catch '^\(IndentationError\|TokenError\|SyntaxError\):'
+    return substitute(v:exception, '^\(.\{-1,}Error\):.*', '\1', 'g')
   endtry
 endfunction
 

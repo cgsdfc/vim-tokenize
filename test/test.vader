@@ -1,21 +1,21 @@
 " Test test.vim
 Before;
 let pyfile='/home/cgsdfc/Vimscripts/vim-tokenize/test/json.py'
-let error_py = '/home/cgsdfc/Vimscripts/vim-tokenize/test/database/unittest/0003.py'
-
-After;
-unlet pyfile
-unlet error_py
+let token_error = '/home/cgsdfc/Vimscripts/vim-tokenize/test/database/unittest/0003.py'
+let syntax_error = '/home/cgsdfc/Vimscripts/vim-tokenize/test/database/unittest/0007.py'
 
 Execute(vim_tokenize);
 call tokenize#test#vim_tokenize(pyfile)
-Log tokenize#test#vim_tokenize(error_py)
+Log tokenize#test#vim_tokenize(token_error)
+Log tokenize#test#vim_tokenize(syntax_error)
 
 Execute(py_tokenize);
 call tokenize#test#py_tokenize(pyfile)
-Log tokenize#test#py_tokenize(error_py)
+Log tokenize#test#py_tokenize(token_error)
+Log tokenize#test#vim_tokenize(syntax_error)
 
 Execute(against);
 Assert tokenize#test#against(pyfile)
-Assert tokenize#test#against(error_py)
+Assert tokenize#test#against(token_error)
+Assert tokenize#test#against(syntax_error)
 

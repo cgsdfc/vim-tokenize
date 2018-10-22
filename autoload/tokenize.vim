@@ -157,7 +157,7 @@ function! tokenize#GetNextToken() dict abort
         let self.end_of_input = 1
         let self.line = ''
       else
-        let self.line = s:decode(self.buffer_[self.lnum], self.encoding)
+        let self.line = s:decode(self.buffer_[self.lnum], self._encoding)
       endif
       let self.lnum += 1
       let [self.pos, self.max] = [0, len(self.line)]
@@ -342,30 +342,33 @@ function! tokenize#GetNextToken() dict abort
   endwhile
 endfunction
 
-function! s:detect_encoding() dict abort
+" Detect encoding from the buffer.
+function! s:detect_encoding(buffer_, buffer_size, filename) abort
   let default = 'utf-8'
-  if self.buffer_size == 0 " empty file
+  if a:buffer_size == 0 " empty file
     return default
   endif
-  let first_ = self.buffer_[0]
-  let encoding = s:find_cookie(first_, self.filename)
+  let first_ = a:buffer_[0]
+  let encoding = s:find_cookie(first_, a:filename)
   if encoding isnot 0
     return encoding
   endif
   if first_ !~ s:Blank
     return default
   endif
-  if self.buffer_size < 2
+  if a:buffer_size < 2
     return default
   endif
-  let second = self.buffer_[1]
-  let encoding = s:find_cookie(second, self.filename)
+  let second = a:buffer_[1]
+  let encoding = s:find_cookie(second, a:filename)
   if encoding isnot 0
     return encoding
   endif
   return default
 endfunction
 
+" Look for encoding declaration from line. We don't care about BOM
+" and don't try to decode the line. Just look for a plausible cookie.
 function! s:find_cookie(line, filename) abort
   let match = matchlist(a:line, s:cookie)
   if empty(match)
@@ -373,7 +376,7 @@ function! s:find_cookie(line, filename) abort
   endif
   let encoding = s:get_normal_name(match[1])
   if has_key(s:LookupTable, encoding)
-    return s:LookupTable[encoding]
+    return encoding
   endif
   throw printf('SyntaxError: unknown encoding for "%s": %s', a:filename, encoding)
 endfunction
@@ -414,10 +417,9 @@ let s:Tokenizer = {
       \ 'lnum': 0,
       \ 'parenlev': 0,
       \ 'indents': [0],
-      \ 'encoding': '',
+      \ '_encoding': '',
       \ 'exact': 0,
       \ 'GetNextToken': function('tokenize#GetNextToken'),
-      \ 'detect_encoding': function('s:detect_encoding'),
       \}
 
 function! s:Tokenizer._on_error(type, msg) abort
@@ -433,9 +435,9 @@ function! tokenize#FromFile(path)
   let tknr.buffer_ = readfile(a:path)
   let tknr.buffer_size = len(tknr.buffer_)
   let tknr.filename = a:path
-  let encoding = tknr.detect_encoding()
-  let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING,
-        \ encoding, [0, 0], [0, 0], '')
+  let encoding = s:detect_encoding(tknr.buffer_, tknr.buffer_size, tknr.filename)
+  let tknr._encoding = s:LookupTable[encoding]
+  let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING, encoding, [0, 0], [0, 0], '')
   return tknr
 endfunction
 
