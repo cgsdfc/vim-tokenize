@@ -140,8 +140,7 @@ function! s:Tokenizer._tokenize() abort
         if !empty(endmatch)     " continued string ends
           let self.pos = len(endmatch[0])
           let self.cpos = strchars(endmatch[0])
-          let end_ = self.pos
-          call add(contstr, self.line[:end_-1])
+          call add(contstr, self.line[:self.pos-1])
           call add(contline, self.line)
           return s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
