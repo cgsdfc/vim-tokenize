@@ -64,7 +64,6 @@ let s:Tokenizer = {
       \ 'async_def': 0,
       \ 'async_def_indent': 0,
       \ 'async_def_nl': 0,
-      \ 'needcont': 0,
       \ 'continued': 0,
       \ 'stashed': 0,
       \ 'pos': 0,
@@ -85,6 +84,7 @@ let s:Tokenizer = {
 " The main tokenizer function.
 function! s:Tokenizer._tokenize() abort
   let is_contstr = 0
+  let needcont = 0
 
   while 1
     if self.end_of_input
@@ -143,11 +143,10 @@ function! s:Tokenizer._tokenize() abort
           let end_ = self.pos
           call add(contstr, self.line[:end_-1])
           call add(contline, self.line)
-          let self.needcont = 0
           return s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cpos], join(contline, ''))
-        elseif self.needcont && self.line[self.max-2:] != "\\\n"
+        elseif needcont && self.line[self.max-2:] != "\\\n"
           call add(contstr, self.line)
           return s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
@@ -259,7 +258,7 @@ function! s:Tokenizer._tokenize() abort
           let endprog = get(s:endpats, initial,
                 \ get(s:endpats, token[1],
                 \ get(s:endpats, token[2])))
-          let self.needcont = 1
+          let needcont = 1
           let is_contstr = 1
           let contstr = [self.line[start_:]]
           let contline = [self.line]
