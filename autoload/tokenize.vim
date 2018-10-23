@@ -166,10 +166,6 @@ let s:Tokenizer = {
 
 " The main tokenizer function.
 function! s:Tokenizer._tokenize() abort
-  if self.error_or_end
-    throw 'StopIteration'
-  endif
-
   while 1
     if self.end_of_input
       if len(self.indents) == 1
@@ -385,9 +381,12 @@ function! s:Tokenizer._tokenize() abort
 endfunction
 
 function! s:Tokenizer.GetNextToken() abort
-  if self.error_or_end && self.stashed isnot 0
-    let [tok, self.stashed] = [self.stashed, 0]
-    return tok
+  if self.error_or_end
+    if self.stashed isnot 0
+      let [tok, self.stashed] = [self.stashed, 0]
+      return tok
+    endif
+    throw 'StopIteration'
   endif
   let tok = self._tokenize()
   let [tok, self.stashed] = [self.stashed, tok]
@@ -396,7 +395,7 @@ endfunction
 
 " Detect encoding from the buffer.
 function! s:detect_encoding(buffer_, buffer_size, filename) abort
-  let default = 'utf8'
+  let default = 'utf-8'
   if a:buffer_size == 0 " empty file
     return default
   endif
@@ -449,6 +448,7 @@ endfunction
 " Handle errors during tokenization.
 function! s:Tokenizer._on_error(type, msg) abort
   let self.error_or_end = 1
+  let self.stashed = 0
   let msg = printf('%s: %s:%d:%d: %s',
         \ a:type, self.filename, self.lnum, self.cpos, a:msg)
   throw msg

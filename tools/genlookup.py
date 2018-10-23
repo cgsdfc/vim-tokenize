@@ -10,7 +10,7 @@ import os
 import codecs
 from pprint import pprint as pp
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 def call_iconv_list():
     '''
@@ -25,7 +25,8 @@ def get_lookup_mapping(il):
     Return a lookup mapping m where acceptable names are mapped to iconv_name
     '''
     def normalize(name):
-        return re.sub('[-_]', '', name).lower()
+        return name
+        # return re.sub('[-_]', '', name).lower()
 
     def iter_names(il):
         for name in il:
