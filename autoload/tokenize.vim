@@ -64,7 +64,6 @@ let s:Tokenizer = {
       \ 'async_def': 0,
       \ 'async_def_indent': 0,
       \ 'async_def_nl': 0,
-      \ 'contstr': 0,
       \ 'needcont': 0,
       \ 'continued': 0,
       \ 'stashed': 0,
@@ -85,6 +84,8 @@ let s:Tokenizer = {
 
 " The main tokenizer function.
 function! s:Tokenizer._tokenize() abort
+  let is_contstr = 0
+
   while 1
     if self.end_of_input
       if len(self.indents) == 1
@@ -120,7 +121,7 @@ function! s:Tokenizer._tokenize() abort
     "   let self.async_def_indent = 0
     " endif
 
-    if self.contstr || self.pos >= self.max
+    if is_contstr || self.pos >= self.max
       if self.lnum >= self.buffer_size
         let self.end_of_input = 1
         let self.line = ''
@@ -131,7 +132,7 @@ function! s:Tokenizer._tokenize() abort
       let [self.pos, self.max] = [0, len(self.line)]
       let [self.cpos, self.cmax] = [0, strchars(self.line)]
 
-      if self.contstr
+      if is_contstr
         if self.end_of_input
           call self._on_error('TokenError', 'EOF in multi-line string')
         endif
@@ -142,13 +143,11 @@ function! s:Tokenizer._tokenize() abort
           let end_ = self.pos
           call add(contstr, self.line[:end_-1])
           call add(contline, self.line)
-          let self.contstr = 0
           let self.needcont = 0
           return s:TokenInfo(s:TokenValue.STRING,
                 \ join(contstr, ''), strstart,
                 \ [self.lnum, self.cpos], join(contline, ''))
         elseif self.needcont && self.line[self.max-2:] != "\\\n"
-          let self.contstr = 0
           call add(contstr, self.line)
           return s:TokenInfo(s:TokenValue.ERRORTOKEN,
                 \ join(contstr, ''), strstart,
@@ -249,7 +248,7 @@ function! s:Tokenizer._tokenize() abort
           let strstart = spos
           let contstr = [self.line[start_:]]
           let contline = [self.line]
-          let self.contstr = 1
+          let is_contstr = 1
           break
         endif
       elseif (has_key(s:single_quoted, initial) ||
@@ -261,7 +260,7 @@ function! s:Tokenizer._tokenize() abort
                 \ get(s:endpats, token[1],
                 \ get(s:endpats, token[2])))
           let self.needcont = 1
-          let self.contstr = 1
+          let is_contstr = 1
           let contstr = [self.line[start_:]]
           let contline = [self.line]
           break
