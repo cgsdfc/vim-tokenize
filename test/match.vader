@@ -1,6 +1,5 @@
 Before;
-let PseudoToken=tokenize#PseudoToken
-" Log matchlist(' [ ', PseudoToken)
+let PseudoToken=tokenize#regex#PseudoToken
 
 Execute(PseudoExtras);
 Log matchlist('     ', PseudoToken)
@@ -42,9 +41,9 @@ Log matchlist(' `  ', PseudoToken)
 Log matchlist(' ?  ', PseudoToken)
 Log matchlist(' $  ', PseudoToken)
 
-Execute(cookie);
-let cookie = tokenize#scriptdict().cookie
-Log matchlist('# coding=utf-8', cookie)
-Log matchlist('# coding=latin-1', cookie)
-Log matchlist('# coding=gbk', cookie)
-Log matchlist('# -*- Mode: Python; coding: utf-8; indent-tabs-mode: nil; tab-width: 4 -*-', cookie)
+Execute(Cookie);
+let Cookie = g:tokenize#regex#Cookie
+Log matchlist('# coding=utf-8', Cookie)
+Log matchlist('# coding=latin-1', Cookie)
+Log matchlist('# coding=gbk', Cookie)
+Log matchlist('# -*- Mode: Python; coding: utf-8; indent-tabs-mode: nil; tab-width: 4 -*-', Cookie)

@@ -1,94 +1,18 @@
-let s:LookupTable = tokenize#lookup#Table
 let s:TAB_SIZE = 8
 let s:TokenValue = tokenize#token#Value
 let s:TokenName = tokenize#token#Name
 let s:AllStringPrefixes = tokenize#token#AllStringPrefixes
 let s:ExactType = tokenize#token#ExactType
-let s:__file__ = expand('<sfile>')
-
-function! s:regex(str) abort
-  return '\m\C'.a:str
-endfunction
-
-function! s:lgroup(list_) abort
-  return '\%('.join(a:list_, '\|').'\)'
-endfunction
-
-function! s:cgroup(...) abort
-  return '\('.join(a:000, '\|').'\)'
-endfunction
-
-function! s:group(...) abort
-  return '\%('.join(a:000, '\|').'\)'
-endfunction
-
-function! s:maybe(...) abort
-  return call('s:group', a:000).'\='
-endfunction
-
-function! s:TokenInfo(type, string, start_, end_, line)
-  return [a:type, a:string, a:start_, a:end_, a:line]
-endfunction
-
-let s:cookie = s:regex("^[ \t\f]*#.\\{-}coding[:=][ \t]*\\([[:alnum:]-.]\\+\\)")
-let s:Blank = s:regex("^[ \t\f]*\\%([#\r\n]\\|$\\)")
-
-let s:Whitespace = s:regex("[ \f\t]*")
-let s:Comment = s:regex("#[^\r\n]*")
-let s:Name = s:regex('\w\+')
-
-let s:Hexnumber = s:regex('0[xX]\%(_\=[0-9a-fA-F]\)\+')
-let s:Binnumber = s:regex('0[bB]\%(_\=[01]\)\+')
-let s:Octnumber = s:regex('0[oO]\%(_\=[0-7]\)\+')
-let s:Decnumber = s:regex('\%(0\%(_\=0\)*\|[1-9]\%(_\=[0-9]\)*\)')
-let s:Intnumber = s:group(s:Hexnumber,s:Binnumber,s:Octnumber,s:Decnumber)
-
-let s:Exponent = s:regex('[eE][-+]\=[0-9]\%(_\=[0-9]\)*')
-let s:Pointfloat = s:group(s:regex('[0-9]\%(_\=[0-9]\)*\.\%([0-9]\%(_\=[0-9]\)*\)\='),
-      \ s:regex('\.[0-9]\%(_\=[0-9]\)*')).s:maybe(s:Exponent)
-let s:Expfloat = s:regex('[0-9]\%(_\=[0-9]\)*'.s:Exponent)
-let s:Floatnumber = s:group(s:Pointfloat, s:Expfloat)
-let s:Imagnumber = s:group(s:regex('[0-9]\%(_\=[0-9]\)*[jJ]'),s:Floatnumber.'[jJ]')
-let s:Number = s:group(s:Imagnumber,s:Floatnumber,s:Intnumber)
-
-let s:Single = s:regex('[^''\\]*\%(\\.[^''\\]*\)*''')
-let s:Double = s:regex('[^"\\]*\%(\\.[^"\\]*\)*"')
-let s:Single3 = s:regex('[^''\\]*\%(\%(\\.\|''\%(''''\)\@!\)[^''\\]*\)*''''''')
-let s:Double3 = s:regex('[^"\\]*\%(\%(\\.\|"\%(""\)\@!\)[^"\\]*\)*"""')
-let s:StringPrefix = s:regex(s:lgroup(s:AllStringPrefixes))
-let s:Triple = s:group(s:StringPrefix."'''", s:StringPrefix.'"""')
-
-let s:Operator = s:regex(s:group('\*\*=\=', '>>=\=', '<<=\=', '!=',
-            \ '//=\?', '->',
-            \ '[+\-*/%&@|^=<>]=\=',
-            \ '\~'))
-
-let s:Bracket = s:regex('[][(){}]')
-let s:Special = s:regex(s:group("\n", '\.\.\.', '[:;.,@]'))
-let s:Funny = s:group(s:Operator,s:Bracket,s:Special)
-
-" First (or only) line of ' or " string.
-let s:ContStr = s:group(s:StringPrefix."'[^'\n\\\\]*\\%(\\\\.[^'\n\\\\]*\\)*"
-            \ .s:group("'", "\\\\\n"),
-            \ s:StringPrefix."\"[^\"\n\\\\]*\\%(\\\\.[^\"\n\\\\]*\\)*"
-            \ .s:group('"', "\\\\\n"))
-let s:PseudoExtras = s:group("\\\\\n\\|\\%$", s:Comment, s:Triple)
-let s:PseudoToken = '^'.s:Whitespace.s:cgroup(
-      \ s:PseudoExtras,
-      \ s:Number,
-      \ s:Funny,
-      \ s:ContStr,
-      \ s:Name)
-let tokenize#PseudoToken = s:PseudoToken
+let s:regex = tokenize#regex#all()
 
 " Map all variations of beginning of a string to patterns
 " of its ending part.
 let s:endpats = {}
 for s:prefix in s:AllStringPrefixes
-    let s:endpats[s:prefix."'"] = s:Single
-    let s:endpats[s:prefix.'"'] = s:Double
-    let s:endpats[s:prefix."'''"] = s:Single3
-    let s:endpats[s:prefix.'"""'] = s:Double3
+    let s:endpats[s:prefix."'"] = s:regex.Single
+    let s:endpats[s:prefix.'"'] = s:regex.Double
+    let s:endpats[s:prefix."'''"] = s:regex.Single3
+    let s:endpats[s:prefix.'"""'] = s:regex.Double3
 endfor
 
 " Keep all variations of single quotes and triple quotes.
@@ -101,13 +25,8 @@ for s:t in s:AllStringPrefixes
   let s:triple_quoted[s:t."'''"] = 1
 endfor
 
-function! tokenize#scriptdict()
-  return s:
-endfunction
-
-" Convert str from encoding to utf-8 adding tailing newline.
-function! s:decode(str, encoding) abort
-  return iconv(a:str, a:encoding, 'UTF-8') . "\n"
+function! s:TokenInfo(type, string, start_, end_, line)
+  return [a:type, a:string, a:start_, a:end_, a:line]
 endfunction
 
 " The Tokenizer structure:
@@ -206,7 +125,7 @@ function! s:Tokenizer._tokenize() abort
         let self.end_of_input = 1
         let self.line = ''
       else
-        let self.line = s:decode(self.buffer_[self.lnum], self._encoding)
+        let self.line = tokenize#codecs#decode(self.buffer_[self.lnum], self._encoding)
       endif
       let self.lnum += 1
       let [self.pos, self.max] = [0, len(self.line)]
@@ -243,7 +162,7 @@ function! s:Tokenizer._tokenize() abort
         if self.end_of_input
           continue
         endif
-        if self.line =~ s:Blank
+        if self.line =~ s:regex.Blank
           let self.blank = 1
         else
           let column = 0
@@ -279,7 +198,7 @@ function! s:Tokenizer._tokenize() abort
     endif
 
     while self.pos < self.max
-      let psmat = matchlist(self.line, s:PseudoToken, self.pos)
+      let psmat = matchlist(self.line, s:regex.PseudoToken, self.pos)
       if empty(psmat)
         let tok = s:TokenInfo(s:TokenValue.ERRORTOKEN, self.line[self.pos],
               \ [self.lnum, self.cpos],
@@ -393,58 +312,6 @@ function! s:Tokenizer.GetNextToken() abort
   return tok
 endfunction
 
-" Detect encoding from the buffer.
-function! s:detect_encoding(buffer_, buffer_size, filename) abort
-  let default = 'utf-8'
-  if a:buffer_size == 0 " empty file
-    return default
-  endif
-  let first_ = a:buffer_[0]
-  let encoding = s:find_cookie(first_, a:filename)
-  if encoding isnot 0
-    return encoding
-  endif
-  if first_ !~ s:Blank
-    return default
-  endif
-  if a:buffer_size < 2
-    return default
-  endif
-  let second = a:buffer_[1]
-  let encoding = s:find_cookie(second, a:filename)
-  if encoding isnot 0
-    return encoding
-  endif
-  return default
-endfunction
-
-" Look for encoding declaration from line. We don't care about BOM
-" and don't try to decode the line. Just look for a plausible cookie.
-function! s:find_cookie(line, filename) abort
-  let match = matchlist(a:line, s:cookie)
-  if empty(match)
-    return 0
-  endif
-  let encoding = s:get_normal_name(match[1])
-  if has_key(s:LookupTable, encoding)
-    return encoding
-  endif
-  throw printf('SyntaxError: unknown encoding for "%s": %s', a:filename, encoding)
-endfunction
-
-" Normalize orig_enc. All characters are lower case and _'s are replaced with
-" -
-function! s:get_normal_name(orig_enc)
-  let enc = substitute(tolower(a:orig_enc[:11]), '[-_]', '', 'g')
-  if enc =~# '^utf8'
-    return 'utf8'
-  endif
-  if enc =~# '^\(latin1\|iso88591\|isolatin1\)'
-    return 'iso88591'
-  endif
-  return a:orig_enc
-endfunction
-
 " Handle errors during tokenization.
 function! s:Tokenizer._on_error(type, msg) abort
   let self.error_or_end = 1
@@ -460,8 +327,8 @@ function! tokenize#FromFile(path)
   let tknr.buffer_ = readfile(a:path)
   let tknr.buffer_size = len(tknr.buffer_)
   let tknr.filename = a:path
-  let encoding = s:detect_encoding(tknr.buffer_, tknr.buffer_size, tknr.filename)
-  let tknr._encoding = s:LookupTable[encoding]
+  let encoding = tokenize#codecs#detect_encoding(tknr.buffer_, tknr.buffer_size, tknr.filename)
+  let tknr._encoding = g:tokenize#lookup#Table[encoding]
   let tknr.stashed = s:TokenInfo(s:TokenValue.ENCODING, encoding, [0, 0], [0, 0], '')
   return tknr
 endfunction

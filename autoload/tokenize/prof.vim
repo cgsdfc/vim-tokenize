@@ -18,7 +18,8 @@ def make_file_list(dir):
         os.walk(dir) for fname in fnames if fname.endswith('.py')]
 
 def sort_on_count(file_list):
-    return sorted([(mapcount(fname), fname) for fname in file_list])
+    non_empty = filter(lambda f: os.stat(f).st_size, file_list)
+    return sorted([(mapcount(fname), fname) for fname in non_empty])
 
 def time_one_file(fname):
     stmt = 'vim.eval("tokenize#prof#bare_tokenize(%r)")' % fname

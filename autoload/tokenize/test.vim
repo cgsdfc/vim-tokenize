@@ -34,7 +34,8 @@ endfunction
 
 " Turn each item in lst into a string.
 function! s:stringify(lst)
-  return map(a:lst, 'tokenize#tuple_as_string(v:val)')
+  return type(a:lst) == type([]) ?
+        \ map(a:lst, 'tokenize#tuple_as_string(v:val)') : a:lst
 endfunction
 
 " Setup a buffer for displaying output. Code came from plug.vim.

@@ -1,6 +1,6 @@
 let s:TokenValue=tokenize#token#Value
 let s:TokenName=tokenize#token#Name
-let s:PseudoToken=tokenize#PseudoToken
+let s:regex = tokenize#regex#all()
 
 let s:LineScanner = {
       \ 'line': 0,
@@ -14,7 +14,7 @@ function! s:LineScanner.GetNextToken() abort
     if self.pos == self.max
       throw 'StopIteration'
     endif
-    let psmat = matchlist(self.line, s:PseudoToken, self.pos)
+    let psmat = matchlist(self.line, s:regex.PseudoToken, self.pos)
     if empty(psmat)
       let self.pos += 1
       let self.cpos += 1

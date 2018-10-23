@@ -18,4 +18,3 @@ Execute(against);
 Assert tokenize#test#against(pyfile)
 Assert tokenize#test#against(token_error)
 Assert tokenize#test#against(syntax_error)
-

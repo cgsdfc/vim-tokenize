@@ -1,5 +1,5 @@
 Before;
-let sd=tokenize#scriptdict()
+let sd=tokenize#regex#scriptdict()
 
 " 注意：=~的匹配是部分匹配，即'1_' =~ sd.Decnumber 为真。
 " 若要实现完全匹配，要在regex加上^$或者\<\>。
@@ -160,12 +160,12 @@ Assert 'aaa"""' =~ sd.Double3
 Assert 'aaa""""' =~ sd.Double3
 Assert 'aaa\a"""' =~ sd.Double3
 
-Execute(cookie);
+Execute(Cookie);
 let s='[[:alnum:]-.]\+'
 Assert '1-2.' =~ s
-Assert '# coding=utf-8' =~ sd.cookie
-Assert '  # coding= utf-8' =~ sd.cookie
-Assert '  # coding: utf-8' =~ sd.cookie
+Assert '# coding=utf-8' =~ sd.Cookie
+Assert '  # coding= utf-8' =~ sd.Cookie
+Assert '  # coding: utf-8' =~ sd.Cookie
 
 Execute(Whitespace Comment);
 Assert '' =~ sd.Whitespace
