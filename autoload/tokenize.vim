@@ -9,10 +9,10 @@ let s:regex = tokenize#regex#all()
 " of its ending part.
 let s:endpats = {}
 for s:prefix in s:AllStringPrefixes
-    let s:endpats[s:prefix."'"] = s:regex.Single
-    let s:endpats[s:prefix.'"'] = s:regex.Double
-    let s:endpats[s:prefix."'''"] = s:regex.Single3
-    let s:endpats[s:prefix.'"""'] = s:regex.Double3
+  let s:endpats[s:prefix."'"] = s:regex.Single
+  let s:endpats[s:prefix.'"'] = s:regex.Double
+  let s:endpats[s:prefix."'''"] = s:regex.Single3
+  let s:endpats[s:prefix.'"""'] = s:regex.Double3
 endfor
 
 " Keep all variations of single quotes and triple quotes.
