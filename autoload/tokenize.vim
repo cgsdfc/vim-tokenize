@@ -164,11 +164,12 @@ function! s:Tokenizer._tokenize() abort
         else
           let column = 0
           while self.pos < self.max
-            if self.line[self.pos] == ' '
+            let chr = self.line[self.pos]
+            if chr == ' '
               let column += 1
-            elseif self.line[self.pos] == "\t"
+            elseif chr == "\t"
               let column = (column / s:TAB_SIZE + 1) * s:TAB_SIZE
-            elseif self.line[self.pos] == "\f"
+            elseif chr == "\f"
               let column = 0
             else
               break
