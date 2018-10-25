@@ -46,3 +46,8 @@ Performance
 ===========
 It is slow in a real sense.
 It is about 100x slower than the python counterpart.
+
+=======
+LICENSE
+=======
+Python Software Foundation License.
