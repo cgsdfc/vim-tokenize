@@ -1,43 +1,43 @@
 ========
 Tokenize
 ========
+
 Python tokenizer written in Vimscript.
 It is compatible with the `tokenize` module in standard library.
 
 ========
 Commands
 ========
-```
-:Tokenize <file>
-```
+
+
+  :Tokenize <file>
+
 Tokenize one file and `echo` the result in a manner similar to `python3 -m tokenize <file>`.
 
-```
-:TokenizeDiff <file>
-```
+  :TokenizeDiff <file>
+
 This is a internal command for testing. It runs `tokenize()` in both vim and python version and
 puts their result in diff mode.
 
 =========
 Functions
 =========
-```
-tokenize#FromFile(path, exact)
-```
+
+  tokenize#FromFile(path, exact)
+  
 Create a `Tokenizer` to tokenize `path`. `exact` tells the tokenizer to return exact token type for
 `OP` tokens such as `<<=` and `+=` instead of returning a broad type `OP`.
 
-```
-Tokenizer.GetNextToken()
-```
+
+  Tokenizer.GetNextToken()
+  
 Return the next token if available. This is an iterative function and it throws `StopIteration` when
 there is no more tokens.
 The returned token is a list of 5 items as `[type, string, start, end, line]`.
 The meanings of these fields are as they are in the python version.
 
-```
-tokenize#list(file, exact)
-```
+  tokenize#list(file, exact)
+
 This is a helper function to create a tokenizer, consume it and concatenate its results in a list.
 
 ==========
