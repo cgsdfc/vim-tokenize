@@ -3,11 +3,9 @@ Generate a vader file to test tokenize().
 '''
 
 import os
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
-TEMPLATE = '''
-Assert tokenize#test#against({filename!r})
-'''
+TEMPLATE = "Assert tokenize#test#against({filename!r})\n"
 
 def glob_pyfiles(dir):
     for dirpath,_,filenames in os.walk(dir):
